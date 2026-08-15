@@ -1,0 +1,46 @@
+const express = require('express');
+const session = require('express-session');
+const cookieParser = require('cookie-parser');
+const path = require('path');
+
+const { initSchema } = require('./db/database');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(cookieParser());
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'petmax-dev-secret-change-me',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 8 }, // 8 hours
+}));
+
+app.use('/api/products', require('./routes/products'));
+app.use('/api/orders', require('./routes/orders'));
+app.use('/api/auth', require('./routes/auth'));
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.use((req, res) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+initSchema()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🐾 Pet Max is running at http://localhost:${PORT}`);
+      console.log(`   Admin panel: http://localhost:${PORT}/admin (default password: petmax2026)`);
+    });
+  })
+  .catch((err) => {
+    console.error('❌ Could not connect to the database. Check your .env DB settings.');
+    console.error(err.message);
+    process.exit(1);
+  });

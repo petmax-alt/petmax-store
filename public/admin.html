@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pet Max — Admin</title>
+<link rel="icon" href="/images/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div class="admin-login" id="loginScreen">
+  <div class="login-card">
+    <img src="/images/logo.png" alt="Pet Max">
+    <h1>Store admin</h1>
+    <p>Sign in to manage products and orders.</p>
+    <form id="loginForm">
+      <div class="form-field full">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" required placeholder="Admin password">
+      </div>
+      <p class="field-error" id="loginError" style="display:none;"></p>
+      <button type="submit" class="btn btn--primary btn--block">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ ADMIN SHELL ============ -->
+<div class="admin-shell" id="adminShell" hidden>
+  <aside class="admin-sidebar">
+    <a href="/" class="brand">
+      <img src="/images/logo.png" alt="Pet Max">
+      <span class="brand-name">PET MAX<span>Admin</span></span>
+    </a>
+    <button class="admin-nav-item active" data-view="dashboard">📊 Dashboard</button>
+    <button class="admin-nav-item" data-view="products">🐾 Products</button>
+    <button class="admin-nav-item" data-view="orders">📦 Orders</button>
+    <div class="admin-nav-spacer"></div>
+    <a href="/" class="admin-nav-item">🌐 View storefront</a>
+    <button class="admin-nav-item" id="logoutBtn">🚪 Log out</button>
+  </aside>
+
+  <main class="admin-main">
+    <!-- Dashboard view -->
+    <section id="view-dashboard">
+      <div class="admin-topbar">
+        <div>
+          <h1>Dashboard</h1>
+          <p>A quick look at how the store is doing.</p>
+        </div>
+      </div>
+      <div class="stat-row" id="statRow"></div>
+      <div class="admin-card">
+        <div class="admin-card-head"><h2>Recent orders</h2></div>
+        <table class="admin-table" id="recentOrdersTable">
+          <thead><tr><th>Order</th><th>Customer</th><th>Payment</th><th>Total</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Products view -->
+    <section id="view-products" hidden>
+      <div class="admin-topbar">
+        <div>
+          <h1>Products</h1>
+          <p>Add, edit, or remove items from the storefront.</p>
+        </div>
+        <button class="btn btn--primary" id="addProductBtn">+ Add product</button>
+      </div>
+      <div class="admin-card">
+        <table class="admin-table">
+          <thead><tr><th></th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Badge</th><th></th></tr></thead>
+          <tbody id="productsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Orders view -->
+    <section id="view-orders" hidden>
+      <div class="admin-topbar">
+        <div>
+          <h1>Orders</h1>
+          <p>Update fulfilment and payment status as orders move.</p>
+        </div>
+      </div>
+      <div class="admin-card">
+        <table class="admin-table">
+          <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Payment</th><th>Total</th><th>Status</th><th>Placed</th></tr></thead>
+          <tbody id="ordersTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ PRODUCT FORM MODAL ============ -->
+<div class="modal" id="productModal">
+  <div class="modal-backdrop" data-close-modal></div>
+  <div class="modal-panel" style="max-width:640px;">
+    <button class="modal-close" data-close-modal>✕</button>
+    <h2 style="padding:28px 30px 0;" id="productModalTitle">Add product</h2>
+    <form id="productForm" class="admin-form-grid">
+      <div class="form-field full">
+        <label for="pf_name">Product name</label>
+        <input type="text" id="pf_name" required>
+      </div>
+      <div class="form-field">
+        <label for="pf_category">Category</label>
+        <select id="pf_category" required>
+          <option>Cat Food</option>
+          <option>Cat Treats</option>
+          <option>Litter & Accessories</option>
+          <option>Grooming</option>
+          <option>Toys</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="pf_icon">Icon style</label>
+        <select id="pf_icon">
+          <option value="food">Food bag</option>
+          <option value="treat">Treat pouch</option>
+          <option value="litter">Litter bag</option>
+          <option value="box">Box / mat</option>
+          <option value="brush">Brush</option>
+          <option value="shampoo">Shampoo</option>
+          <option value="toy">Toy</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="pf_price">Price (Rs)</label>
+        <input type="number" id="pf_price" min="0" required>
+      </div>
+      <div class="form-field">
+        <label for="pf_compare">Compare-at price (optional)</label>
+        <input type="number" id="pf_compare" min="0">
+      </div>
+      <div class="form-field">
+        <label for="pf_stock">Stock quantity</label>
+        <input type="number" id="pf_stock" min="0" required>
+      </div>
+      <div class="form-field">
+        <label for="pf_badge">Badge</label>
+        <select id="pf_badge">
+          <option value="">None</option>
+          <option value="Bestseller">Bestseller</option>
+          <option value="New">New</option>
+        </select>
+      </div>
+      <div class="form-field full">
+        <label for="pf_accent">Card color accent</label>
+        <select id="pf_accent">
+          <option value="orange">Orange</option>
+          <option value="navy">Navy</option>
+        </select>
+      </div>
+      <div class="form-field full">
+        <label for="pf_description">Description</label>
+        <textarea id="pf_description" rows="3"></textarea>
+      </div>
+      <p class="field-error" id="productFormError" style="display:none;"></p>
+      <div class="admin-form-actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Cancel</button>
+        <button type="submit" class="btn btn--primary" id="productSaveBtn">Save product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/icons.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>
