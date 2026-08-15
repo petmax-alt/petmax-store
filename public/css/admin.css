@@ -88,7 +88,7 @@ table.admin-table tr:last-child td { border-bottom: none; }
 .admin-login {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
   background: var(--ink);
-}
+}  .admin-login[hidden], .admin-shell[hidden] { display: none; }
 .login-card {
   background: var(--white); border-radius: var(--radius-lg); padding: 40px 36px;
   width: 100%; max-width: 380px; box-shadow: var(--shadow-lift); text-align: center;
