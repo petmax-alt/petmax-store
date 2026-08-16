@@ -102,6 +102,27 @@ async function initSchema() {
     `);
 
     await conn.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        phone VARCHAR(50),
+        password_hash VARCHAR(255) NOT NULL,
+        password_salt VARCHAR(64) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Migration: link orders to a registered customer when one placed them (still nullable — guest checkout stays supported)
+    const [customerIdCol] = await conn.query(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'customer_id'
+    `);
+    if (customerIdCol.length === 0) {
+      await conn.query('ALTER TABLE orders ADD COLUMN customer_id INT NULL');
+    }
+
+    await conn.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
         order_code VARCHAR(50) NOT NULL UNIQUE,
@@ -173,6 +194,35 @@ async function initSchema() {
     for (const [key, value] of Object.entries(defaults)) {
       await conn.query('INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
     }
+
+    // Homepage content — editable text/images for the existing sections, not a page builder.
+    const homepageDefaults = {
+      hero_heading: "Everything your cat needs, delivered.",
+      hero_subheading: "Premium food, treats, and accessories — hand-picked for Pakistan's pet parents.",
+      hero_cta_text: "Shop now",
+      banner_text: "",
+      banner_link: "",
+      featured_category: "",
+    };
+    for (const [key, value] of Object.entries(homepageDefaults)) {
+      await conn.query('INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
+    }
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS blog_posts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) NOT NULL UNIQUE,
+        excerpt VARCHAR(500),
+        content LONGTEXT,
+        cover_image_data LONGBLOB,
+        cover_image_mime VARCHAR(100),
+        status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        published_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
   } finally {
     conn.release();
   }

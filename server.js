@@ -14,7 +14,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'petmax-dev-secret-change-me',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 * 8 }, // 8 hours
+  cookie: { maxAge: 1000 * 60 * 60 * 24 * 30 }, // 30 days — customers shouldn't have to re-login every visit
 }));
 
 app.use('/api/products', require('./routes/products'));
@@ -22,6 +22,7 @@ app.use('/api/orders', require('./routes/orders'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/categories', require('./routes/categories'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/customers', require('./routes/customers').router);
 
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res) => {

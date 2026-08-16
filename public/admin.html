@@ -162,10 +162,18 @@
       <div class="admin-topbar">
         <div>
           <h1>Customers</h1>
-          <p>Everyone who's ordered from your store, grouped by phone number.</p>
+          <p>Registered accounts, plus everyone who's ordered as a guest.</p>
         </div>
       </div>
       <div class="admin-card">
+        <div class="admin-card-head"><h2>Registered accounts</h2></div>
+        <table class="admin-table">
+          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Orders</th><th>Total spent</th></tr></thead>
+          <tbody id="registeredCustomersTableBody"></tbody>
+        </table>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-head"><h2>All orders, by phone number</h2><p style="font-size:0.8rem; color:var(--ink-soft); margin:0;">Includes guest checkouts</p></div>
         <table class="admin-table">
           <thead><tr><th>Customer</th><th>Phone</th><th>City</th><th>Orders</th><th>Total spent</th></tr></thead>
           <tbody id="customersTableBody"></tbody>

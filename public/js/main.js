@@ -349,6 +349,132 @@ document.getElementById('checkoutBtn').addEventListener('click', () => {
   openModal(document.getElementById('checkoutModal'));
 });
 
+// ---------------- Customer account ----------------
+let CURRENT_CUSTOMER = null;
+
+async function loadCurrentCustomer() {
+  const res = await fetch('/api/customers/me');
+  CURRENT_CUSTOMER = await res.json();
+  updateAccountIcon();
+}
+
+function updateAccountIcon() {
+  const btn = document.getElementById('accountBtn');
+  btn.title = CURRENT_CUSTOMER ? `${CURRENT_CUSTOMER.name} — My account` : 'Sign in';
+}
+
+function renderAccountModal() {
+  const body = document.getElementById('accountBody');
+  if (CURRENT_CUSTOMER) {
+    body.innerHTML = `
+      <h2>Hi, ${CURRENT_CUSTOMER.name.split(' ')[0]}</h2>
+      <p>${CURRENT_CUSTOMER.email}</p>
+      <div id="myOrdersList" style="margin:18px 0; max-height:320px; overflow-y:auto;"><p style="color:var(--ink-soft); font-size:0.88rem;">Loading your orders…</p></div>
+      <button class="btn btn--ghost" id="accountLogoutBtn" style="width:100%;">Log out</button>
+    `;
+    fetch('/api/customers/me/orders').then(r => r.json()).then(orders => {
+      const list = document.getElementById('myOrdersList');
+      if (!list) return;
+      list.innerHTML = orders.length ? orders.map(o => `
+        <div style="padding:12px 0; border-bottom:1px solid var(--sand-line);">
+          <div style="display:flex; justify-content:space-between; font-weight:700;"><span>${o.order_code}</span><span>${fmt(o.total)}</span></div>
+          <div style="font-size:0.8rem; color:var(--ink-soft); margin-top:2px;">${new Date(o.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })} · ${o.status}</div>
+        </div>
+      `).join('') : `<p style="color:var(--ink-soft); font-size:0.88rem;">No orders yet.</p>`;
+    });
+    document.getElementById('accountLogoutBtn').addEventListener('click', async () => {
+      await fetch('/api/customers/logout', { method: 'POST' });
+      CURRENT_CUSTOMER = null;
+      updateAccountIcon();
+      closeModal(document.getElementById('accountModal'));
+      toast('Logged out');
+    });
+    return;
+  }
+
+  body.innerHTML = `
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-tab="login">Log in</button>
+      <button type="button" class="auth-tab" data-tab="signup">Sign up</button>
+    </div>
+    <form id="loginForm" class="form-grid" style="margin-top:16px;">
+      <div class="form-field full"><label for="lg_email">Email</label><input type="email" id="lg_email" required></div>
+      <div class="form-field full"><label for="lg_password">Password</label><input type="password" id="lg_password" required></div>
+      <p class="field-error" id="loginError" style="display:none; grid-column:1/-1;"></p>
+      <button type="submit" class="btn btn--primary" style="grid-column:1/-1;">Log in</button>
+    </form>
+    <form id="signupForm" class="form-grid" hidden style="margin-top:16px;">
+      <div class="form-field full"><label for="su_name">Full name</label><input type="text" id="su_name" required></div>
+      <div class="form-field full"><label for="su_email">Email</label><input type="email" id="su_email" required></div>
+      <div class="form-field full"><label for="su_phone">Phone (optional)</label><input type="tel" id="su_phone"></div>
+      <div class="form-field full"><label for="su_password">Password</label><input type="password" id="su_password" required minlength="6"></div>
+      <p class="field-error" id="signupError" style="display:none; grid-column:1/-1;"></p>
+      <button type="submit" class="btn btn--primary" style="grid-column:1/-1;">Create account</button>
+    </form>
+  `;
+
+  body.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      body.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('loginForm').hidden = tab.dataset.tab !== 'login';
+      document.getElementById('signupForm').hidden = tab.dataset.tab !== 'signup';
+    });
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById('loginError');
+    errorEl.style.display = 'none';
+    try {
+      const res = await fetch('/api/customers/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: document.getElementById('lg_email').value, password: document.getElementById('lg_password').value }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      CURRENT_CUSTOMER = data;
+      updateAccountIcon();
+      toast(`Welcome back, ${data.name.split(' ')[0]}`);
+      renderAccountModal();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+    }
+  });
+
+  document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById('signupError');
+    errorEl.style.display = 'none';
+    try {
+      const res = await fetch('/api/customers/signup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('su_name').value,
+          email: document.getElementById('su_email').value,
+          phone: document.getElementById('su_phone').value,
+          password: document.getElementById('su_password').value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      CURRENT_CUSTOMER = data;
+      updateAccountIcon();
+      toast(`Welcome, ${data.name.split(' ')[0]}`);
+      renderAccountModal();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+    }
+  });
+}
+
+document.getElementById('accountBtn').addEventListener('click', () => {
+  renderAccountModal();
+  openModal(document.getElementById('accountModal'));
+});
+
 function renderCheckoutForm() {
   const body = document.getElementById('checkoutBody');
   const items = Cart.getItems();
@@ -364,11 +490,11 @@ function renderCheckoutForm() {
       <div class="form-grid">
         <div class="form-field">
           <label for="ck_name">Full name</label>
-          <input type="text" id="ck_name" required placeholder="e.g. Hassan Ahmed">
+          <input type="text" id="ck_name" required placeholder="e.g. Hassan Ahmed" value="${CURRENT_CUSTOMER ? CURRENT_CUSTOMER.name : ''}">
         </div>
         <div class="form-field">
           <label for="ck_phone">Phone number</label>
-          <input type="tel" id="ck_phone" required placeholder="03XX-XXXXXXX">
+          <input type="tel" id="ck_phone" required placeholder="03XX-XXXXXXX" value="${CURRENT_CUSTOMER && CURRENT_CUSTOMER.phone ? CURRENT_CUSTOMER.phone : ''}">
         </div>
       </div>
       <div class="form-field full">
@@ -598,6 +724,7 @@ async function loadSiteSettings() {
 
 (async function init() {
   await loadSiteSettings();
+  await loadCurrentCustomer();
   await loadCategories();
   await loadProducts();
   renderCartDrawer();

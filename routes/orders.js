@@ -88,9 +88,9 @@ router.post('/', async (req, res) => {
     const payment_status = payment_method === 'online' ? 'awaiting_verification' : 'pending';
 
     const [info] = await conn.query(`
-      INSERT INTO orders (order_code, customer_name, phone, address, city, notes, payment_method, payment_status, transaction_id, items, subtotal, delivery_fee, total)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [order_code, customer_name, phone, address, city, notes || '', payment_method || 'cod', payment_status, transaction_id || null, JSON.stringify(verifiedItems), subtotal, delivery_fee, total]);
+      INSERT INTO orders (order_code, customer_name, phone, address, city, notes, payment_method, payment_status, transaction_id, items, subtotal, delivery_fee, total, customer_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [order_code, customer_name, phone, address, city, notes || '', payment_method || 'cod', payment_status, transaction_id || null, JSON.stringify(verifiedItems), subtotal, delivery_fee, total, (req.session && req.session.customerId) || null]);
 
     for (const it of verifiedItems) {
       if (it.variant_id) {

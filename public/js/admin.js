@@ -221,7 +221,7 @@ document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
     });
     if (btn.dataset.view === 'categories') renderCategoriesTable();
     if (btn.dataset.view === 'inventory') renderInventoryTable();
-    if (btn.dataset.view === 'customers') renderCustomersTable();
+    if (btn.dataset.view === 'customers') { renderCustomersTable(); renderRegisteredCustomersTable(); }
   });
 });
 
@@ -435,6 +435,21 @@ function renderInventoryTable() {
       renderDashboard();
     });
   });
+}
+
+async function renderRegisteredCustomersTable() {
+  const res = await fetch('/api/customers');
+  const customers = await res.json();
+  document.getElementById('registeredCustomersTableBody').innerHTML = customers.map(c => `
+    <tr>
+      <td><b>${c.name}</b></td>
+      <td>${c.email}</td>
+      <td>${c.phone || '—'}</td>
+      <td>${new Date(c.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+      <td>${c.order_count}</td>
+      <td>${fmt(c.total_spent)}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="6" style="text-align:center; color:var(--ink-soft); padding:30px;">No registered accounts yet</td></tr>`;
 }
 
 // ---------------- Customers (derived from orders — full accounts coming later) ----------------

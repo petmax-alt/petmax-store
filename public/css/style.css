@@ -156,6 +156,10 @@ h1, h2, h3, h4 {
 }
 .icon-btn:hover { background: var(--sand-line); }
 
+.auth-tabs { display: flex; gap: 6px; background: var(--sand); border-radius: var(--radius-pill); padding: 4px; }
+.auth-tab { flex: 1; padding: 9px 0; border: none; background: transparent; border-radius: var(--radius-pill); font-weight: 700; font-size: 0.88rem; color: var(--ink-soft); }
+.auth-tab.active { background: var(--white); color: var(--ink); box-shadow: var(--shadow-card); }
+
 .badge-count {
   position: absolute;
   top: -4px;
