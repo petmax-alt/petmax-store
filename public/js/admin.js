@@ -524,10 +524,13 @@ function statusPill(status) {
 }
 
 // ---------------- Products table ----------------
+let SELECTED_PRODUCT_IDS = new Set();
+
 function renderProductsTable() {
   const tbody = document.getElementById('productsTableBody');
   tbody.innerHTML = PRODUCTS.map(p => `
     <tr>
+      <td><input type="checkbox" class="product-select-cb" data-select="${p.id}" ${SELECTED_PRODUCT_IDS.has(p.id) ? 'checked' : ''}></td>
       <td><div class="admin-thumb">${productImageSrc(p) ? `<img src="${productImageSrc(p)}" alt="${p.name}">` : getProductIcon(p.icon, p.accent)}</div></td>
       <td><b>${p.name}</b>${p.has_variants ? ` <span class="pill pill-gray" style="margin-left:6px;">${p.variant_count} variants</span>` : ''}</td>
       <td>${p.category}</td>
@@ -541,7 +544,15 @@ function renderProductsTable() {
         </div>
       </td>
     </tr>
-  `).join('') || `<tr><td colspan="7" style="text-align:center; color:var(--ink-soft); padding:30px;">No products yet</td></tr>`;
+  `).join('') || `<tr><td colspan="8" style="text-align:center; color:var(--ink-soft); padding:30px;">No products yet</td></tr>`;
+
+  tbody.querySelectorAll('[data-select]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = Number(cb.dataset.select);
+      if (cb.checked) SELECTED_PRODUCT_IDS.add(id); else SELECTED_PRODUCT_IDS.delete(id);
+      updateBulkBar();
+    });
+  });
 
   tbody.querySelectorAll('[data-edit]').forEach(el => el.addEventListener('click', () => openProductForm(Number(el.dataset.edit))));
   tbody.querySelectorAll('[data-delete]').forEach(el => el.addEventListener('click', () => deleteProduct(Number(el.dataset.delete))));
@@ -675,6 +686,67 @@ async function deleteProduct(id) {
   renderProductsTable();
   renderDashboard();
 }
+
+// ---------------- Bulk actions ----------------
+function updateBulkBar() {
+  const bar = document.getElementById('bulkActionBar');
+  const count = SELECTED_PRODUCT_IDS.size;
+  bar.hidden = count === 0;
+  document.getElementById('bulkSelectedCount').textContent = `${count} selected`;
+
+  const catSelect = document.getElementById('bulkCategorySelect');
+  catSelect.innerHTML = `<option value="">Move to category…</option>` + CATEGORIES.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+
+  const selectAll = document.getElementById('selectAllProducts');
+  selectAll.checked = count > 0 && count === PRODUCTS.length;
+  selectAll.indeterminate = count > 0 && count < PRODUCTS.length;
+}
+
+document.getElementById('selectAllProducts').addEventListener('change', (e) => {
+  SELECTED_PRODUCT_IDS = e.target.checked ? new Set(PRODUCTS.map(p => p.id)) : new Set();
+  renderProductsTable();
+  updateBulkBar();
+});
+
+document.getElementById('bulkClearBtn').addEventListener('click', () => {
+  SELECTED_PRODUCT_IDS = new Set();
+  renderProductsTable();
+  updateBulkBar();
+});
+
+document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
+  const ids = [...SELECTED_PRODUCT_IDS];
+  if (ids.length === 0) return;
+  if (!confirm(`Delete ${ids.length} product(s)? This can't be undone.`)) return;
+  const res = await fetch('/api/products/bulk-delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error, true);
+  toast(`${data.deleted} product(s) deleted`);
+  SELECTED_PRODUCT_IDS = new Set();
+  await loadProducts();
+  renderProductsTable();
+  renderDashboard();
+  updateBulkBar();
+});
+
+document.getElementById('bulkCategorySelect').addEventListener('change', async (e) => {
+  const category = e.target.value;
+  if (!category) return;
+  const ids = [...SELECTED_PRODUCT_IDS];
+  const res = await fetch('/api/products/bulk-category', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, category }),
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error, true);
+  toast(`${data.updated} product(s) moved to ${category}`);
+  SELECTED_PRODUCT_IDS = new Set();
+  e.target.value = '';
+  await loadProducts();
+  renderProductsTable();
+  updateBulkBar();
+});
 
 // ---------------- Orders table ----------------
 function renderOrdersTable() {

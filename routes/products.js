@@ -353,6 +353,34 @@ router.patch('/:id/stock', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /api/products/bulk-delete (admin only) — body: { ids: [1,2,3] }
+router.post('/bulk-delete', requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids must be a non-empty array' });
+    const [info] = await pool.query('DELETE FROM products WHERE id IN (?)', [ids]);
+    res.json({ success: true, deleted: info.affectedRows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong deleting products.' });
+  }
+});
+
+// POST /api/products/bulk-category (admin only) — body: { ids: [1,2,3], category: "Cat Food" }
+router.post('/bulk-category', requireAdmin, async (req, res) => {
+  try {
+    const { ids, category } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0 || !category) {
+      return res.status(400).json({ error: 'ids (array) and category are required' });
+    }
+    const [info] = await pool.query('UPDATE products SET category = ? WHERE id IN (?)', [category, ids]);
+    res.json({ success: true, updated: info.affectedRows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong moving products.' });
+  }
+});
+
 // DELETE /api/products/:id (admin only)
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {

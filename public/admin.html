@@ -90,9 +90,19 @@
         </div>
         <button class="btn btn--primary" id="addProductBtn">+ Add product</button>
       </div>
+      <div class="bulk-action-bar" id="bulkActionBar" hidden>
+        <span id="bulkSelectedCount">0 selected</span>
+        <div class="bulk-action-bar-actions">
+          <select id="bulkCategorySelect">
+            <option value="">Move to category…</option>
+          </select>
+          <button class="btn btn--ghost" id="bulkDeleteBtn">Delete selected</button>
+          <button class="btn btn--ghost" id="bulkClearBtn">Clear selection</button>
+        </div>
+      </div>
       <div class="admin-card">
         <table class="admin-table">
-          <thead><tr><th></th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Badge</th><th></th></tr></thead>
+          <thead><tr><th><input type="checkbox" id="selectAllProducts"></th><th></th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Badge</th><th></th></tr></thead>
           <tbody id="productsTableBody"></tbody>
         </table>
       </div>
