@@ -98,6 +98,10 @@ function renderGrid() {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const product = ALL_PRODUCTS.find(p => p.id === Number(el.dataset.add));
+      if (product.has_variants) {
+        openQuickView(product.id); // must pick an option first
+        return;
+      }
       Cart.addItem(product, 1);
       toast(`${product.name} added to cart`);
     });
@@ -121,72 +125,105 @@ function productCardHTML(p) {
       <h3 class="product-name" data-quickview="${p.id}" style="cursor:pointer;">${p.name}</h3>
       <div class="product-rating"><span class="stars">${'★'.repeat(Math.round(p.rating))}${'☆'.repeat(5 - Math.round(p.rating))}</span> (${p.reviews})</div>
       <div class="product-price-row">
-        <span class="price">${fmt(p.price)}</span>
-        ${p.compare_price ? `<span class="price-compare">${fmt(p.compare_price)}</span>` : ''}
+        ${p.has_variants
+          ? `<span class="price">${fmt(p.price_range.min)}${p.price_range.min !== p.price_range.max ? ' – ' + fmt(p.price_range.max) : ''}</span>`
+          : `<span class="price">${fmt(p.price)}</span>${p.compare_price ? `<span class="price-compare">${fmt(p.compare_price)}</span>` : ''}`
+        }
       </div>
       ${outOfStock ? '<span class="stock-out">Out of stock</span>' : lowStock ? `<span class="stock-low">Only ${p.stock} left</span>` : ''}
       <div class="product-footer">
-        <button class="btn btn--ink" data-add="${p.id}" ${outOfStock ? 'disabled' : ''}>${outOfStock ? 'Sold out' : 'Add to cart'}</button>
+        <button class="btn btn--ink" data-add="${p.id}" ${outOfStock ? 'disabled' : ''}>${outOfStock ? 'Sold out' : p.has_variants ? 'Choose options' : 'Add to cart'}</button>
       </div>
     </div>
   </div>`;
 }
 
 // ---------------- Quick view modal ----------------
-function openQuickView(id) {
-  const p = ALL_PRODUCTS.find(x => x.id === id);
-  if (!p) return;
+async function openQuickView(id) {
+  const listVersion = ALL_PRODUCTS.find(x => x.id === id);
+  if (!listVersion) return;
+  // The list endpoint only has aggregate variant data — fetch the full detail
+  // (individual variants, full gallery) before rendering the picker.
+  const res = await fetch(`/api/products/${listVersion.slug}`);
+  const p = await res.json();
+
   const body = document.getElementById('quickViewBody');
-  const outOfStock = p.stock <= 0;
+  let selectedVariant = p.has_variants ? p.variants.find(v => v.stock > 0) || p.variants[0] : null;
 
-  body.innerHTML = `
-    <div class="qv-media accent-${p.accent}">${p.has_image ? `<img src="/api/products/image/${p.id}" alt="${p.name}" class="product-photo">` : getProductIcon(p.icon, p.accent)}</div>
-    <div class="qv-info">
-      <span class="product-category">${p.category}</span>
-      <h2>${p.name}</h2>
-      <div class="product-rating"><span class="stars">${'★'.repeat(Math.round(p.rating))}${'☆'.repeat(5 - Math.round(p.rating))}</span> (${p.reviews} reviews)</div>
-      <p class="desc">${p.description || ''}</p>
-      <div class="qv-price-row">
-        <span class="price">${fmt(p.price)}</span>
-        ${p.compare_price ? `<span class="price-compare">${fmt(p.compare_price)}</span>` : ''}
-      </div>
-      ${outOfStock
-        ? '<p class="stock-out">Currently out of stock</p>'
-        : `<div class="qv-qty-row">
-            <div class="qty-control" id="qvQtyControl">
-              <button type="button" data-qv-dec>−</button>
-              <span id="qvQty">1</span>
-              <button type="button" data-qv-inc>+</button>
-            </div>
-            <span style="font-size:0.82rem; color:var(--ink-soft);">${p.stock} in stock</span>
-          </div>`
-      }
-      <div class="qv-actions">
-        <button class="btn btn--primary" id="qvAddToCart" ${outOfStock ? 'disabled' : ''}>Add to cart</button>
-        <a class="btn btn--whatsapp" id="qvWhatsapp" href="#" target="_blank" rel="noopener">Order on WhatsApp</a>
-      </div>
+  function currentPrice() { return selectedVariant ? selectedVariant.price : p.price; }
+  function currentStock() { return selectedVariant ? selectedVariant.stock : p.stock; }
+  function currentOutOfStock() { return currentStock() <= 0; }
+
+  function variantPickerHTML() {
+    if (!p.has_variants) return '';
+    return `<div class="variant-picker">
+      ${p.variants.map(v => `
+        <button type="button" class="variant-chip ${v.id === selectedVariant.id ? 'active' : ''} ${v.stock <= 0 ? 'disabled' : ''}"
+          data-variant="${v.id}" ${v.stock <= 0 ? 'disabled' : ''}>${v.label}${v.stock <= 0 ? ' (out of stock)' : ''}</button>
+      `).join('')}
     </div>`;
-
-  let qty = 1;
-  if (!outOfStock) {
-    body.querySelector('[data-qv-inc]').addEventListener('click', () => {
-      qty = Math.min(p.stock, qty + 1);
-      body.querySelector('#qvQty').textContent = qty;
-    });
-    body.querySelector('[data-qv-dec]').addEventListener('click', () => {
-      qty = Math.max(1, qty - 1);
-      body.querySelector('#qvQty').textContent = qty;
-    });
-    body.querySelector('#qvAddToCart').addEventListener('click', () => {
-      Cart.addItem(p, qty);
-      toast(`${p.name} added to cart`);
-      closeModal(document.getElementById('quickViewModal'));
-    });
   }
 
-  const waText = `Hi Pet Max! I'd like to order:\n\n${p.name} — ${fmt(p.price)}\n\nCould you confirm availability and delivery time?`;
-  body.querySelector('#qvWhatsapp').href = waLink(CONFIG.whatsappNumber, waText);
+  function render() {
+    const outOfStock = currentOutOfStock();
+    body.innerHTML = `
+      <div class="qv-media accent-${p.accent}">${p.has_image ? `<img src="/api/products/image/${p.id}" alt="${p.name}" class="product-photo">` : getProductIcon(p.icon, p.accent)}</div>
+      <div class="qv-info">
+        <span class="product-category">${p.category}</span>
+        <h2>${p.name}</h2>
+        <div class="product-rating"><span class="stars">${'★'.repeat(Math.round(p.rating))}${'☆'.repeat(5 - Math.round(p.rating))}</span> (${p.reviews} reviews)</div>
+        <p class="desc">${p.description || ''}</p>
+        ${variantPickerHTML()}
+        <div class="qv-price-row">
+          <span class="price">${fmt(currentPrice())}</span>
+          ${!p.has_variants && p.compare_price ? `<span class="price-compare">${fmt(p.compare_price)}</span>` : ''}
+        </div>
+        ${outOfStock
+          ? '<p class="stock-out">Currently out of stock</p>'
+          : `<div class="qv-qty-row">
+              <div class="qty-control" id="qvQtyControl">
+                <button type="button" data-qv-dec>−</button>
+                <span id="qvQty">1</span>
+                <button type="button" data-qv-inc>+</button>
+              </div>
+              <span style="font-size:0.82rem; color:var(--ink-soft);">${currentStock()} in stock</span>
+            </div>`
+        }
+        <div class="qv-actions">
+          <button class="btn btn--primary" id="qvAddToCart" ${outOfStock ? 'disabled' : ''}>Add to cart</button>
+          <a class="btn btn--whatsapp" id="qvWhatsapp" href="#" target="_blank" rel="noopener">Order on WhatsApp</a>
+        </div>
+      </div>`;
 
+    body.querySelectorAll('[data-variant]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        selectedVariant = p.variants.find(v => v.id === Number(chip.dataset.variant));
+        render();
+      });
+    });
+
+    let qty = 1;
+    if (!outOfStock) {
+      body.querySelector('[data-qv-inc]').addEventListener('click', () => {
+        qty = Math.min(currentStock(), qty + 1);
+        body.querySelector('#qvQty').textContent = qty;
+      });
+      body.querySelector('[data-qv-dec]').addEventListener('click', () => {
+        qty = Math.max(1, qty - 1);
+        body.querySelector('#qvQty').textContent = qty;
+      });
+      body.querySelector('#qvAddToCart').addEventListener('click', () => {
+        Cart.addItem(p, qty, selectedVariant);
+        toast(`${p.name} added to cart`);
+        closeModal(document.getElementById('quickViewModal'));
+      });
+    }
+
+    const waText = `Hi Pet Max! I'd like to order:\n\n${p.name}${selectedVariant ? ' — ' + selectedVariant.label : ''} — ${fmt(currentPrice())}\n\nCould you confirm availability and delivery time?`;
+    body.querySelector('#qvWhatsapp').href = waLink(CONFIG.whatsappNumber, waText);
+  }
+
+  render();
   openModal(document.getElementById('quickViewModal'));
 }
 
@@ -231,35 +268,36 @@ function renderCartDrawer() {
   }
 
   foot.hidden = false;
-  body.innerHTML = items.map(i => `
-    <div class="cart-line" data-line="${i.id}">
+  body.innerHTML = items.map((i, idx) => `
+    <div class="cart-line" data-line="${idx}">
       <div class="cart-line-thumb accent-${i.accent}">${getProductIcon(i.icon, i.accent)}</div>
       <div class="cart-line-info">
         <div class="name">${i.name}</div>
         <div class="cat">${i.category}</div>
         <div class="cart-line-actions">
           <div class="qty-control">
-            <button type="button" data-dec="${i.id}">−</button>
+            <button type="button" data-dec="${idx}">−</button>
             <span>${i.qty}</span>
-            <button type="button" data-inc="${i.id}">+</button>
+            <button type="button" data-inc="${idx}">+</button>
           </div>
           <span class="line-price">${fmt(i.price * i.qty)}</span>
         </div>
-        <button class="remove-line" data-remove="${i.id}">Remove</button>
+        <button class="remove-line" data-remove="${idx}">Remove</button>
       </div>
     </div>
   `).join('');
 
   body.querySelectorAll('[data-inc]').forEach(el => el.addEventListener('click', () => {
-    const item = items.find(i => i.id === Number(el.dataset.inc));
-    Cart.setQty(item.id, Math.min(item.stock, item.qty + 1));
+    const item = items[Number(el.dataset.inc)];
+    Cart.setQty(item.id, Math.min(item.stock, item.qty + 1), item.variant_id);
   }));
   body.querySelectorAll('[data-dec]').forEach(el => el.addEventListener('click', () => {
-    const item = items.find(i => i.id === Number(el.dataset.dec));
-    Cart.setQty(item.id, item.qty - 1);
+    const item = items[Number(el.dataset.dec)];
+    Cart.setQty(item.id, item.qty - 1, item.variant_id);
   }));
   body.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', () => {
-    Cart.removeItem(Number(el.dataset.remove));
+    const item = items[Number(el.dataset.remove)];
+    Cart.removeItem(item.id, item.variant_id);
     toast('Removed from cart');
   }));
 
@@ -407,7 +445,7 @@ function renderCheckoutForm() {
       notes: document.getElementById('ck_notes').value.trim(),
       payment_method: paymentMethod,
       transaction_id: paymentMethod === 'online' ? document.getElementById('ck_txn').value.trim() : null,
-      items: items.map(i => ({ id: i.id, qty: i.qty })),
+      items: items.map(i => ({ id: i.id, qty: i.qty, variant_id: i.variant_id || null })),
     };
 
     const btn = document.getElementById('placeOrderBtn');

@@ -740,6 +740,14 @@ h1, h2, h3, h4 {
 .qv-info .desc { color: var(--ink-soft); font-size: 0.94rem; margin-bottom: 20px; }
 .qv-price-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 20px; }
 .qv-price-row .price { font-size: 1.6rem; }
+
+.variant-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.variant-chip {
+  padding: 8px 16px; border-radius: var(--radius-pill); border: 1.5px solid var(--sand-line);
+  background: var(--white); font-size: 0.85rem; font-weight: 600; color: var(--ink);
+}
+.variant-chip.active { border-color: var(--orange); background: var(--sand); color: var(--orange-dark); }
+.variant-chip.disabled, .variant-chip:disabled { opacity: 0.45; text-decoration: line-through; cursor: not-allowed; }
 .qv-actions { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
 .qv-actions .btn { flex: 1; min-width: 160px; }
 .qv-qty-row { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }

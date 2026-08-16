@@ -7,8 +7,10 @@ let PRODUCTS = [];
 let ORDERS = [];
 let CATEGORIES = [];
 let EDITING_PRODUCT_ID = null;
-let SELECTED_IMAGE_FILE = null; // holds a new upload until the form is saved
-let REMOVE_IMAGE = false;
+let EXISTING_IMAGES = [];   // [{id}] already on the product, in display order
+let REMOVE_IMAGE_IDS = [];  // existing image ids the admin removed this session
+let NEW_IMAGE_FILES = [];   // File objects staged for upload, with local preview URLs
+let VARIANTS = [];          // [{id?, label, sku, price, compare_price, stock}] — id present only if already saved
 
 function productImageSrc(p) {
   return p.has_image ? `/api/products/image/${p.id}` : null;
@@ -27,52 +29,132 @@ descriptionEditor.on('text-change', () => {
   document.getElementById('pf_description').value = descriptionEditor.root.innerHTML;
 });
 
-// ---------------- Image dropzone ----------------
+// ---------------- Multi-photo gallery ----------------
 const dropzone = document.getElementById('imageDropzone');
-const dropzoneEmpty = document.getElementById('imageDropzoneEmpty');
-const dropzonePreview = document.getElementById('imageDropzonePreview');
-const previewImg = document.getElementById('imagePreviewImg');
 const fileInput = document.getElementById('pf_image');
+const galleryGrid = document.getElementById('imageGalleryGrid');
 
-function showImagePreview(src) {
-  previewImg.src = src;
-  dropzoneEmpty.hidden = true;
-  dropzonePreview.hidden = false;
+function renderGallery() {
+  const existingThumbs = EXISTING_IMAGES
+    .filter(img => !REMOVE_IMAGE_IDS.includes(img.id))
+    .map((img, i) => `
+      <div class="gallery-thumb ${i === 0 && NEW_IMAGE_FILES.length === 0 ? 'cover' : ''}" draggable="true" data-existing-id="${img.id}">
+        <img src="/api/products/images/${img.id}" alt="Product photo">
+        <button type="button" class="thumb-remove" data-remove-existing="${img.id}">✕</button>
+      </div>
+    `).join('');
+
+  const newThumbs = NEW_IMAGE_FILES.map((file, i) => `
+    <div class="gallery-thumb ${i === 0 && EXISTING_IMAGES.filter(img => !REMOVE_IMAGE_IDS.includes(img.id)).length === 0 ? 'cover' : ''}" data-new-index="${i}">
+      <img src="${file.previewUrl}" alt="New photo">
+      <button type="button" class="thumb-remove" data-remove-new="${i}">✕</button>
+    </div>
+  `).join('');
+
+  galleryGrid.innerHTML = existingThumbs + newThumbs;
+
+  galleryGrid.querySelectorAll('[data-remove-existing]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      REMOVE_IMAGE_IDS.push(Number(btn.dataset.removeExisting));
+      renderGallery();
+    });
+  });
+  galleryGrid.querySelectorAll('[data-remove-new]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      NEW_IMAGE_FILES.splice(Number(btn.dataset.removeNew), 1);
+      renderGallery();
+    });
+  });
+
+  // Drag-to-reorder among existing (already-saved) images
+  let dragId = null;
+  galleryGrid.querySelectorAll('[data-existing-id]').forEach(thumb => {
+    thumb.addEventListener('dragstart', () => { dragId = Number(thumb.dataset.existingId); });
+    thumb.addEventListener('dragover', (e) => { e.preventDefault(); thumb.classList.add('drag-over'); });
+    thumb.addEventListener('dragleave', () => thumb.classList.remove('drag-over'));
+    thumb.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      thumb.classList.remove('drag-over');
+      const targetId = Number(thumb.dataset.existingId);
+      if (dragId === null || dragId === targetId) return;
+      const order = EXISTING_IMAGES.map(img => img.id);
+      const fromIdx = order.indexOf(dragId);
+      const toIdx = order.indexOf(targetId);
+      order.splice(fromIdx, 1);
+      order.splice(toIdx, 0, dragId);
+      EXISTING_IMAGES = order.map(id => ({ id }));
+      renderGallery();
+      if (EDITING_PRODUCT_ID) {
+        await fetch(`/api/products/${EDITING_PRODUCT_ID}/images/order`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order }),
+        });
+      }
+    });
+  });
 }
-function clearImagePreview() {
-  previewImg.src = '';
-  dropzoneEmpty.hidden = false;
-  dropzonePreview.hidden = true;
-}
-function handleImageFile(file) {
-  if (!file || !file.type.startsWith('image/')) return;
-  SELECTED_IMAGE_FILE = file;
-  REMOVE_IMAGE = false;
-  const reader = new FileReader();
-  reader.onload = (e) => showImagePreview(e.target.result);
-  reader.readAsDataURL(file);
+
+function addNewImageFiles(files) {
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    if (EXISTING_IMAGES.length - REMOVE_IMAGE_IDS.length + NEW_IMAGE_FILES.length >= 6) break;
+    file.previewUrl = URL.createObjectURL(file);
+    NEW_IMAGE_FILES.push(file);
+  }
+  renderGallery();
 }
 
 dropzone.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', () => handleImageFile(fileInput.files[0]));
-
+fileInput.addEventListener('change', () => { addNewImageFiles([...fileInput.files]); fileInput.value = ''; });
 ['dragover', 'dragenter'].forEach(evt =>
   dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); })
 );
 ['dragleave', 'drop'].forEach(evt =>
   dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); })
 );
-dropzone.addEventListener('drop', (e) => {
-  const file = e.dataTransfer.files[0];
-  if (file) handleImageFile(file);
-});
+dropzone.addEventListener('drop', (e) => addNewImageFiles([...e.dataTransfer.files]));
 
-document.getElementById('imageRemoveBtn').addEventListener('click', (e) => {
-  e.stopPropagation();
-  SELECTED_IMAGE_FILE = null;
-  REMOVE_IMAGE = true;
-  fileInput.value = '';
-  clearImagePreview();
+// ---------------- Variants editor ----------------
+function renderVariants() {
+  const list = document.getElementById('variantsList');
+  if (VARIANTS.length === 0) {
+    list.innerHTML = '';
+    return;
+  }
+  list.innerHTML = `
+    <div class="variant-row-labels"><span>Label</span><span>SKU</span><span>Price</span><span>Compare</span><span>Stock</span><span></span></div>
+    ${VARIANTS.map((v, i) => `
+      <div class="variant-row" data-variant-idx="${i}">
+        <input type="text" placeholder="e.g. Small — Chicken" value="${v.label || ''}" data-vfield="label">
+        <input type="text" placeholder="SKU" value="${v.sku || ''}" data-vfield="sku">
+        <input type="number" min="0" placeholder="Price" value="${v.price ?? ''}" data-vfield="price">
+        <input type="number" min="0" placeholder="Compare" value="${v.compare_price ?? ''}" data-vfield="compare_price">
+        <input type="number" min="0" placeholder="Stock" value="${v.stock ?? ''}" data-vfield="stock">
+        <button type="button" data-remove-variant="${i}">✕</button>
+      </div>
+    `).join('')}
+  `;
+  list.querySelectorAll('[data-variant-idx]').forEach(row => {
+    const idx = Number(row.dataset.variantIdx);
+    row.querySelectorAll('[data-vfield]').forEach(input => {
+      input.addEventListener('input', () => { VARIANTS[idx][input.dataset.vfield] = input.value; });
+    });
+  });
+  list.querySelectorAll('[data-remove-variant]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = Number(btn.dataset.removeVariant);
+      const variant = VARIANTS[idx];
+      if (variant.id && EDITING_PRODUCT_ID) {
+        await fetch(`/api/products/${EDITING_PRODUCT_ID}/variants/${variant.id}`, { method: 'DELETE' });
+      }
+      VARIANTS.splice(idx, 1);
+      renderVariants();
+    });
+  });
+}
+
+document.getElementById('addVariantBtn').addEventListener('click', () => {
+  VARIANTS.push({ label: '', sku: '', price: '', compare_price: '', stock: '' });
+  renderVariants();
 });
 
 function toast(msg, isError) {
@@ -327,9 +409,12 @@ function renderInventoryTable() {
         <td>${p.stock}</td>
         <td>${badge}</td>
         <td class="stock-adjust">
-          <button data-stock-adjust="${p.id}" data-delta="-1">−</button>
-          <span>${p.stock}</span>
-          <button data-stock-adjust="${p.id}" data-delta="1">+</button>
+          ${p.has_variants
+            ? `<span style="font-size:0.78rem; color:var(--ink-soft);">Edit product to adjust</span>`
+            : `<button data-stock-adjust="${p.id}" data-delta="-1">−</button>
+               <span>${p.stock}</span>
+               <button data-stock-adjust="${p.id}" data-delta="1">+</button>`
+          }
         </td>
       </tr>
     `;
@@ -444,9 +529,9 @@ function renderProductsTable() {
   tbody.innerHTML = PRODUCTS.map(p => `
     <tr>
       <td><div class="admin-thumb">${productImageSrc(p) ? `<img src="${productImageSrc(p)}" alt="${p.name}">` : getProductIcon(p.icon, p.accent)}</div></td>
-      <td><b>${p.name}</b></td>
+      <td><b>${p.name}</b>${p.has_variants ? ` <span class="pill pill-gray" style="margin-left:6px;">${p.variant_count} variants</span>` : ''}</td>
       <td>${p.category}</td>
-      <td>${fmt(p.price)}</td>
+      <td>${p.has_variants ? `${fmt(p.price_range.min)}${p.price_range.min !== p.price_range.max ? '–' + fmt(p.price_range.max) : ''}` : fmt(p.price)}</td>
       <td>${p.stock <= 0 ? '<span class="pill pill-red">Out</span>' : p.stock <= 5 ? `<span class="pill pill-orange">${p.stock} left</span>` : p.stock}</td>
       <td>${p.badge ? `<span class="pill pill-gray">${p.badge}</span>` : '—'}</td>
       <td>
@@ -464,20 +549,27 @@ function renderProductsTable() {
 
 document.getElementById('addProductBtn').addEventListener('click', () => openProductForm(null));
 
-function openProductForm(id) {
+async function openProductForm(id) {
   EDITING_PRODUCT_ID = id;
   const modal = document.getElementById('productModal');
   const errorEl = document.getElementById('productFormError');
   errorEl.style.display = 'none';
   document.getElementById('productForm').reset();
   descriptionEditor.setContents([]);
-  SELECTED_IMAGE_FILE = null;
-  REMOVE_IMAGE = false;
-  clearImagePreview();
+  EXISTING_IMAGES = [];
+  REMOVE_IMAGE_IDS = [];
+  NEW_IMAGE_FILES = [];
+  VARIANTS = [];
+  renderGallery();
+  renderVariants();
 
   if (id) {
-    const p = PRODUCTS.find(x => x.id === id);
     document.getElementById('productModalTitle').textContent = 'Edit product';
+    // Fetch full detail — the list view only has aggregate data, not individual images/variants.
+    const listVersion = PRODUCTS.find(x => x.id === id);
+    const res = await fetch(`/api/products/${listVersion.slug}`);
+    const p = await res.json();
+
     document.getElementById('pf_name').value = p.name;
     document.getElementById('pf_category').value = p.category;
     document.getElementById('pf_icon').value = p.icon;
@@ -486,9 +578,14 @@ function openProductForm(id) {
     document.getElementById('pf_stock').value = p.stock;
     document.getElementById('pf_badge').value = p.badge || '';
     document.getElementById('pf_accent').value = p.accent;
+    document.getElementById('pf_sku').value = p.sku || '';
     if (p.description) descriptionEditor.root.innerHTML = p.description;
     document.getElementById('pf_description').value = p.description || '';
-    if (productImageSrc(p)) showImagePreview(productImageSrc(p));
+
+    EXISTING_IMAGES = p.images || [];
+    VARIANTS = (p.variants || []).map(v => ({ ...v }));
+    renderGallery();
+    renderVariants();
   } else {
     document.getElementById('productModalTitle').textContent = 'Add product';
   }
@@ -517,9 +614,10 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   formData.append('stock', document.getElementById('pf_stock').value);
   formData.append('badge', document.getElementById('pf_badge').value);
   formData.append('accent', document.getElementById('pf_accent').value);
+  formData.append('sku', document.getElementById('pf_sku').value.trim());
   formData.append('description', document.getElementById('pf_description').value.trim());
-  if (SELECTED_IMAGE_FILE) formData.append('image', SELECTED_IMAGE_FILE);
-  if (REMOVE_IMAGE) formData.append('remove_image', 'true');
+  NEW_IMAGE_FILES.forEach(file => formData.append('images', file));
+  if (REMOVE_IMAGE_IDS.length) formData.append('remove_image_ids', JSON.stringify(REMOVE_IMAGE_IDS));
 
   const saveBtn = document.getElementById('productSaveBtn');
   saveBtn.disabled = true;
@@ -533,6 +631,24 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
     const res = await fetch(url, { method, body: formData });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not save product');
+
+    const productId = data.id;
+
+    // Sync variants: update ones that already have an id, create ones that don't.
+    // (Deletions already happened immediately when the ✕ was clicked, in renderVariants.)
+    for (const v of VARIANTS) {
+      if (!v.label || v.price === '' || v.price === undefined) continue; // skip incomplete rows
+      const body = JSON.stringify({
+        label: v.label, sku: v.sku || '', price: Number(v.price),
+        compare_price: v.compare_price === '' ? '' : Number(v.compare_price),
+        stock: Number(v.stock) || 0,
+      });
+      if (v.id) {
+        await fetch(`/api/products/${productId}/variants/${v.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body });
+      } else {
+        await fetch(`/api/products/${productId}/variants`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      }
+    }
 
     document.getElementById('productModal').classList.remove('open');
     document.body.style.overflow = '';

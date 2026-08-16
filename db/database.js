@@ -52,6 +52,55 @@ async function initSchema() {
       await conn.query('ALTER TABLE products ADD COLUMN image_mime VARCHAR(100)');
     }
 
+    // Migration: base SKU field for products without variants
+    const [skuCol] = await conn.query(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'sku'
+    `);
+    if (skuCol.length === 0) {
+      await conn.query('ALTER TABLE products ADD COLUMN sku VARCHAR(100)');
+    }
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS product_images (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        image_data LONGBLOB NOT NULL,
+        image_mime VARCHAR(100) NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Migration: carry the old single-photo-per-product column forward as each
+    // product's first gallery image, so nothing already uploaded gets lost.
+    const [alreadyMigrated] = await conn.query('SELECT COUNT(*) AS c FROM product_images');
+    if (alreadyMigrated[0].c === 0) {
+      const [withOldImage] = await conn.query('SELECT id, image_data, image_mime FROM products WHERE image_data IS NOT NULL');
+      for (const p of withOldImage) {
+        await conn.query(
+          'INSERT INTO product_images (product_id, image_data, image_mime, sort_order) VALUES (?, ?, ?, 0)',
+          [p.id, p.image_data, p.image_mime]
+        );
+      }
+    }
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS product_variants (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        label VARCHAR(150) NOT NULL,
+        sku VARCHAR(100),
+        price INT NOT NULL,
+        compare_price INT,
+        stock INT NOT NULL DEFAULT 0,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      )
+    `);
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id INT AUTO_INCREMENT PRIMARY KEY,

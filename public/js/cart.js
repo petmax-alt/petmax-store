@@ -22,39 +22,47 @@ const Cart = (() => {
     return read();
   }
 
-  function addItem(product, qty = 1) {
+  function lineKey(id, variantId) {
+    return `${id}::${variantId || 'base'}`;
+  }
+
+  function addItem(product, qty = 1, variant = null) {
     const items = read();
-    const existing = items.find(i => i.id === product.id);
+    const key = lineKey(product.id, variant && variant.id);
+    const existing = items.find(i => lineKey(i.id, i.variant_id) === key);
     if (existing) {
       existing.qty += qty;
     } else {
       items.push({
         id: product.id,
-        name: product.name,
-        price: product.price,
+        variant_id: variant ? variant.id : null,
+        name: variant ? `${product.name} — ${variant.label}` : product.name,
+        price: variant ? variant.price : product.price,
         category: product.category,
         icon: product.icon,
         accent: product.accent,
-        stock: product.stock,
+        stock: variant ? variant.stock : product.stock,
         qty,
       });
     }
     write(items);
   }
 
-  function setQty(id, qty) {
+  function setQty(id, qty, variantId = null) {
     let items = read();
+    const key = lineKey(id, variantId);
     if (qty <= 0) {
-      items = items.filter(i => i.id !== id);
+      items = items.filter(i => lineKey(i.id, i.variant_id) !== key);
     } else {
-      const item = items.find(i => i.id === id);
+      const item = items.find(i => lineKey(i.id, i.variant_id) === key);
       if (item) item.qty = qty;
     }
     write(items);
   }
 
-  function removeItem(id) {
-    const items = read().filter(i => i.id !== id);
+  function removeItem(id, variantId = null) {
+    const key = lineKey(id, variantId);
+    const items = read().filter(i => lineKey(i.id, i.variant_id) !== key);
     write(items);
   }
 

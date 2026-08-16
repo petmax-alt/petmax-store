@@ -36,19 +36,42 @@ router.post('/', async (req, res) => {
     const verifiedItems = [];
 
     for (const item of items) {
+      const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+
+      if (item.variant_id) {
+        const [variantRows] = await conn.query(
+          'SELECT v.*, p.name AS product_name FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.id = ? AND v.product_id = ? FOR UPDATE',
+          [item.variant_id, item.id]
+        );
+        const variant = variantRows[0];
+        if (!variant) {
+          await conn.rollback();
+          return res.status(400).json({ error: `Selected option for product #${item.id} no longer exists.` });
+        }
+        if (variant.stock < qty) {
+          await conn.rollback();
+          return res.status(400).json({ error: `Only ${variant.stock} left in stock for "${variant.product_name} — ${variant.label}".` });
+        }
+        subtotal += variant.price * qty;
+        verifiedItems.push({
+          id: variant.product_id, variant_id: variant.id,
+          name: `${variant.product_name} — ${variant.label}`, price: variant.price, qty,
+        });
+        continue;
+      }
+
       const [rows] = await conn.query('SELECT * FROM products WHERE id = ? FOR UPDATE', [item.id]);
       const product = rows[0];
       if (!product) {
         await conn.rollback();
         return res.status(400).json({ error: `Product #${item.id} no longer exists.` });
       }
-      const qty = Math.max(1, parseInt(item.qty, 10) || 1);
       if (product.stock < qty) {
         await conn.rollback();
         return res.status(400).json({ error: `Only ${product.stock} left in stock for "${product.name}".` });
       }
       subtotal += product.price * qty;
-      verifiedItems.push({ id: product.id, name: product.name, price: product.price, qty });
+      verifiedItems.push({ id: product.id, variant_id: null, name: product.name, price: product.price, qty });
     }
 
     const [settingsRows] = await conn.query(
@@ -70,7 +93,11 @@ router.post('/', async (req, res) => {
     `, [order_code, customer_name, phone, address, city, notes || '', payment_method || 'cod', payment_status, transaction_id || null, JSON.stringify(verifiedItems), subtotal, delivery_fee, total]);
 
     for (const it of verifiedItems) {
-      await conn.query('UPDATE products SET stock = stock - ? WHERE id = ?', [it.qty, it.id]);
+      if (it.variant_id) {
+        await conn.query('UPDATE product_variants SET stock = stock - ? WHERE id = ?', [it.qty, it.variant_id]);
+      } else {
+        await conn.query('UPDATE products SET stock = stock - ? WHERE id = ?', [it.qty, it.id]);
+      }
     }
 
     await conn.commit();
