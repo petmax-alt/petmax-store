@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/admin.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css" rel="stylesheet">
 </head>
 <body>
 
@@ -109,6 +110,19 @@
         <label for="pf_name">Product name</label>
         <input type="text" id="pf_name" required>
       </div>
+      <div class="form-field full">
+        <label>Product photo</label>
+        <div class="image-dropzone" id="imageDropzone">
+          <div class="image-dropzone-empty" id="imageDropzoneEmpty">
+            <span>📷 Drag a photo here, or click to browse</span>
+          </div>
+          <div class="image-dropzone-preview" id="imageDropzonePreview" hidden>
+            <img id="imagePreviewImg" alt="Product photo preview">
+            <button type="button" class="btn btn--ghost" id="imageRemoveBtn">Remove photo</button>
+          </div>
+          <input type="file" id="pf_image" accept="image/*" hidden>
+        </div>
+      </div>
       <div class="form-field">
         <label for="pf_category">Category</label>
         <select id="pf_category" required>
@@ -160,7 +174,8 @@
       </div>
       <div class="form-field full">
         <label for="pf_description">Description</label>
-        <textarea id="pf_description" rows="3"></textarea>
+        <div id="pf_description_editor"></div>
+        <input type="hidden" id="pf_description">
       </div>
       <p class="field-error" id="productFormError" style="display:none;"></p>
       <div class="admin-form-actions">
@@ -174,6 +189,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="/js/icons.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
 <script src="/js/admin.js"></script>
 </body>
 </html>

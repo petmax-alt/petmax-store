@@ -1,10 +1,30 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const { pool } = require('../db/database');
 const { requireAdmin } = require('../middleware/auth');
 
+// Images go straight into MySQL — no disk writes, so nothing gets lost on redeploy.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB per image is plenty for a product photo
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed'));
+    }
+    cb(null, true);
+  },
+});
+
 function slugify(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+// Never send raw image bytes in list/detail JSON — that would bloat every response.
+// Instead we send a boolean flag; the frontend fetches the real image from /image/:id.
+function stripImageBlob(row) {
+  const { image_data, ...rest } = row;
+  return { ...rest, has_image: !!image_data };
 }
 
 // GET /api/products  ?category=&search=&sort=
@@ -32,7 +52,7 @@ router.get('/', async (req, res) => {
     sql += ` ORDER BY ${sortMap[sort] || 'created_at DESC'}`;
 
     const [rows] = await pool.query(sql, params);
-    res.json(rows);
+    res.json(rows.map(stripImageBlob));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong loading products.' });
@@ -50,45 +70,63 @@ router.get('/categories', async (req, res) => {
   }
 });
 
+// GET /api/products/image/:id — serves the actual photo bytes from MySQL
+router.get('/image/:id', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT image_data, image_mime FROM products WHERE id = ?', [req.params.id]);
+    const row = rows[0];
+    if (!row || !row.image_data) return res.status(404).end();
+    res.set('Content-Type', row.image_mime || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=86400'); // images rarely change once uploaded
+    res.send(row.image_data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).end();
+  }
+});
+
 // GET /api/products/:slug
 router.get('/:slug', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM products WHERE slug = ?', [req.params.slug]);
     if (!rows[0]) return res.status(404).json({ error: 'Product not found' });
-    res.json(rows[0]);
+    res.json(stripImageBlob(rows[0]));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong loading the product.' });
   }
 });
 
-// POST /api/products  (admin only)
-router.post('/', requireAdmin, async (req, res) => {
+// POST /api/products  (admin only) — multipart/form-data, optional "image" file field
+router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
   const { name, category, price, compare_price, stock, description, icon, accent, badge } = req.body;
   if (!name || !category || !price) {
     return res.status(400).json({ error: 'name, category and price are required' });
   }
   const slug = slugify(name);
+  const image_data = req.file ? req.file.buffer : null;
+  const image_mime = req.file ? req.file.mimetype : null;
   try {
     const [info] = await pool.query(`
-      INSERT INTO products (name, slug, category, price, compare_price, stock, description, icon, accent, badge)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [name, slug, category, price, compare_price || null, stock || 0, description || '', icon || 'food', accent || 'orange', badge || null]);
+      INSERT INTO products (name, slug, category, price, compare_price, stock, description, icon, accent, badge, image_data, image_mime)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [name, slug, category, price, compare_price || null, stock || 0, description || '', icon || 'food', accent || 'orange', badge || null, image_data, image_mime]);
     const [created] = await pool.query('SELECT * FROM products WHERE id = ?', [info.insertId]);
-    res.status(201).json(created[0]);
+    res.status(201).json(stripImageBlob(created[0]));
   } catch (err) {
+    console.error(err);
     res.status(400).json({ error: 'A product with a similar name already exists' });
   }
 });
 
-// PUT /api/products/:id  (admin only)
-router.put('/:id', requireAdmin, async (req, res) => {
+// PUT /api/products/:id  (admin only) — multipart/form-data, optional "image" file field
+router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
   try {
     const [existingRows] = await pool.query('SELECT * FROM products WHERE id = ?', [req.params.id]);
     const existing = existingRows[0];
     if (!existing) return res.status(404).json({ error: 'Product not found' });
 
-    const { name, category, price, compare_price, stock, description, icon, accent, badge } = req.body;
+    const { name, category, price, compare_price, stock, description, icon, accent, badge, remove_image } = req.body;
     const updated = {
       name: name ?? existing.name,
       category: category ?? existing.category,
@@ -102,13 +140,24 @@ router.put('/:id', requireAdmin, async (req, res) => {
     };
     const slug = name ? slugify(name) : existing.slug;
 
+    // Only touch the image if a new file was uploaded, or the admin explicitly asked to remove it.
+    let image_data = existing.image_data;
+    let image_mime = existing.image_mime;
+    if (req.file) {
+      image_data = req.file.buffer;
+      image_mime = req.file.mimetype;
+    } else if (remove_image === 'true') {
+      image_data = null;
+      image_mime = null;
+    }
+
     await pool.query(`
-      UPDATE products SET name=?, slug=?, category=?, price=?, compare_price=?, stock=?, description=?, icon=?, accent=?, badge=?
+      UPDATE products SET name=?, slug=?, category=?, price=?, compare_price=?, stock=?, description=?, icon=?, accent=?, badge=?, image_data=?, image_mime=?
       WHERE id=?
-    `, [updated.name, slug, updated.category, updated.price, updated.compare_price, updated.stock, updated.description, updated.icon, updated.accent, updated.badge, req.params.id]);
+    `, [updated.name, slug, updated.category, updated.price, updated.compare_price, updated.stock, updated.description, updated.icon, updated.accent, updated.badge, image_data, image_mime, req.params.id]);
 
     const [result] = await pool.query('SELECT * FROM products WHERE id = ?', [req.params.id]);
-    res.json(result[0]);
+    res.json(stripImageBlob(result[0]));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong updating the product.' });

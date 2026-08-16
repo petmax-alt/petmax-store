@@ -114,7 +114,7 @@ function productCardHTML(p) {
   <div class="product-card">
     <div class="product-media accent-${p.accent}" data-quickview="${p.id}">
       ${badge}
-      ${getProductIcon(p.icon, p.accent)}
+      ${p.has_image ? `<img src="/api/products/image/${p.id}" alt="${p.name}" class="product-photo">` : getProductIcon(p.icon, p.accent)}
     </div>
     <div class="product-body">
       <span class="product-category">${p.category}</span>
@@ -140,7 +140,7 @@ function openQuickView(id) {
   const outOfStock = p.stock <= 0;
 
   body.innerHTML = `
-    <div class="qv-media accent-${p.accent}">${getProductIcon(p.icon, p.accent)}</div>
+    <div class="qv-media accent-${p.accent}">${p.has_image ? `<img src="/api/products/image/${p.id}" alt="${p.name}" class="product-photo">` : getProductIcon(p.icon, p.accent)}</div>
     <div class="qv-info">
       <span class="product-category">${p.category}</span>
       <h2>${p.name}</h2>

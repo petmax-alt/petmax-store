@@ -6,6 +6,73 @@ const fmt = (n) => `Rs ${Number(n).toLocaleString('en-PK')}`;
 let PRODUCTS = [];
 let ORDERS = [];
 let EDITING_PRODUCT_ID = null;
+let SELECTED_IMAGE_FILE = null; // holds a new upload until the form is saved
+let REMOVE_IMAGE = false;
+
+function productImageSrc(p) {
+  return p.has_image ? `/api/products/image/${p.id}` : null;
+}
+
+// ---------------- Rich text editor ----------------
+const descriptionEditor = new Quill('#pf_description_editor', {
+  theme: 'snow',
+  placeholder: 'Tell customers what makes this product great…',
+  modules: {
+    toolbar: [['bold', 'italic', 'underline'], [{ list: 'ordered' }, { list: 'bullet' }], ['link'], ['clean']],
+  },
+});
+// Keep the hidden input in sync so the rest of the form logic doesn't need to know Quill exists
+descriptionEditor.on('text-change', () => {
+  document.getElementById('pf_description').value = descriptionEditor.root.innerHTML;
+});
+
+// ---------------- Image dropzone ----------------
+const dropzone = document.getElementById('imageDropzone');
+const dropzoneEmpty = document.getElementById('imageDropzoneEmpty');
+const dropzonePreview = document.getElementById('imageDropzonePreview');
+const previewImg = document.getElementById('imagePreviewImg');
+const fileInput = document.getElementById('pf_image');
+
+function showImagePreview(src) {
+  previewImg.src = src;
+  dropzoneEmpty.hidden = true;
+  dropzonePreview.hidden = false;
+}
+function clearImagePreview() {
+  previewImg.src = '';
+  dropzoneEmpty.hidden = false;
+  dropzonePreview.hidden = true;
+}
+function handleImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  SELECTED_IMAGE_FILE = file;
+  REMOVE_IMAGE = false;
+  const reader = new FileReader();
+  reader.onload = (e) => showImagePreview(e.target.result);
+  reader.readAsDataURL(file);
+}
+
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => handleImageFile(fileInput.files[0]));
+
+['dragover', 'dragenter'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); })
+);
+['dragleave', 'drop'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); })
+);
+dropzone.addEventListener('drop', (e) => {
+  const file = e.dataTransfer.files[0];
+  if (file) handleImageFile(file);
+});
+
+document.getElementById('imageRemoveBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  SELECTED_IMAGE_FILE = null;
+  REMOVE_IMAGE = true;
+  fileInput.value = '';
+  clearImagePreview();
+});
 
 function toast(msg) {
   const el = document.getElementById('toast');
@@ -135,7 +202,7 @@ function renderProductsTable() {
   const tbody = document.getElementById('productsTableBody');
   tbody.innerHTML = PRODUCTS.map(p => `
     <tr>
-      <td><div class="admin-thumb">${getProductIcon(p.icon, p.accent)}</div></td>
+      <td><div class="admin-thumb">${productImageSrc(p) ? `<img src="${productImageSrc(p)}" alt="${p.name}">` : getProductIcon(p.icon, p.accent)}</div></td>
       <td><b>${p.name}</b></td>
       <td>${p.category}</td>
       <td>${fmt(p.price)}</td>
@@ -162,6 +229,10 @@ function openProductForm(id) {
   const errorEl = document.getElementById('productFormError');
   errorEl.style.display = 'none';
   document.getElementById('productForm').reset();
+  descriptionEditor.setContents([]);
+  SELECTED_IMAGE_FILE = null;
+  REMOVE_IMAGE = false;
+  clearImagePreview();
 
   if (id) {
     const p = PRODUCTS.find(x => x.id === id);
@@ -174,7 +245,9 @@ function openProductForm(id) {
     document.getElementById('pf_stock').value = p.stock;
     document.getElementById('pf_badge').value = p.badge || '';
     document.getElementById('pf_accent').value = p.accent;
+    if (p.description) descriptionEditor.root.innerHTML = p.description;
     document.getElementById('pf_description').value = p.description || '';
+    if (productImageSrc(p)) showImagePreview(productImageSrc(p));
   } else {
     document.getElementById('productModalTitle').textContent = 'Add product';
   }
@@ -194,17 +267,18 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   const errorEl = document.getElementById('productFormError');
   errorEl.style.display = 'none';
 
-  const payload = {
-    name: document.getElementById('pf_name').value.trim(),
-    category: document.getElementById('pf_category').value,
-    icon: document.getElementById('pf_icon').value,
-    price: Number(document.getElementById('pf_price').value),
-    compare_price: document.getElementById('pf_compare').value ? Number(document.getElementById('pf_compare').value) : '',
-    stock: Number(document.getElementById('pf_stock').value),
-    badge: document.getElementById('pf_badge').value,
-    accent: document.getElementById('pf_accent').value,
-    description: document.getElementById('pf_description').value.trim(),
-  };
+  const formData = new FormData();
+  formData.append('name', document.getElementById('pf_name').value.trim());
+  formData.append('category', document.getElementById('pf_category').value);
+  formData.append('icon', document.getElementById('pf_icon').value);
+  formData.append('price', document.getElementById('pf_price').value);
+  formData.append('compare_price', document.getElementById('pf_compare').value || '');
+  formData.append('stock', document.getElementById('pf_stock').value);
+  formData.append('badge', document.getElementById('pf_badge').value);
+  formData.append('accent', document.getElementById('pf_accent').value);
+  formData.append('description', document.getElementById('pf_description').value.trim());
+  if (SELECTED_IMAGE_FILE) formData.append('image', SELECTED_IMAGE_FILE);
+  if (REMOVE_IMAGE) formData.append('remove_image', 'true');
 
   const saveBtn = document.getElementById('productSaveBtn');
   saveBtn.disabled = true;
@@ -213,11 +287,9 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   try {
     const url = EDITING_PRODUCT_ID ? `/api/products/${EDITING_PRODUCT_ID}` : '/api/products';
     const method = EDITING_PRODUCT_ID ? 'PUT' : 'POST';
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    // No Content-Type header here on purpose — the browser sets the multipart
+    // boundary itself when the body is a FormData object.
+    const res = await fetch(url, { method, body: formData });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not save product');
 

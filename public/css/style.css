@@ -444,6 +444,7 @@ h1, h2, h3, h4 {
 }
 .product-media.accent-navy { background: #E4EAF3; }
 .product-media svg { width: 78%; height: 78%; }
+.product-media .product-photo, .qv-media .product-photo { width: 100%; height: 100%; object-fit: cover; }
 
 .product-badge {
   position: absolute;

@@ -21,7 +21,13 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/auth', require('./routes/auth'));
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res) => {
+    // Always revalidate CSS/JS with the server instead of trusting browser cache guesses.
+    // Prevents the "I pushed a fix but my browser won't show it" problem.
+    res.setHeader('Cache-Control', 'no-cache');
+  },
+}));
 
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
