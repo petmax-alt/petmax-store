@@ -20,6 +20,8 @@ app.use(session({
 app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/categories', require('./routes/categories'));
+app.use('/api/settings', require('./routes/settings'));
 
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res) => {

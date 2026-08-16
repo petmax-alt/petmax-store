@@ -9,8 +9,9 @@ function makeOrderCode() {
   return `PM-${stamp}${rand}`;
 }
 
-const DELIVERY_FEE = 200; // flat rate, free over threshold handled client-side too
-const FREE_DELIVERY_THRESHOLD = 3000;
+// Fallback values only — real values now live in the settings table (admin-editable).
+const DEFAULT_DELIVERY_FEE = 200;
+const DEFAULT_FREE_DELIVERY_THRESHOLD = 3000;
 
 // POST /api/orders — place a new order (COD or online)
 router.post('/', async (req, res) => {
@@ -50,7 +51,15 @@ router.post('/', async (req, res) => {
       verifiedItems.push({ id: product.id, name: product.name, price: product.price, qty });
     }
 
-    const delivery_fee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+    const [settingsRows] = await conn.query(
+      "SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('delivery_fee', 'free_delivery_threshold')"
+    );
+    const settingsMap = {};
+    for (const row of settingsRows) settingsMap[row.setting_key] = row.setting_value;
+    const deliveryFeeAmount = Number(settingsMap.delivery_fee ?? DEFAULT_DELIVERY_FEE);
+    const freeDeliveryThreshold = Number(settingsMap.free_delivery_threshold ?? DEFAULT_FREE_DELIVERY_THRESHOLD);
+
+    const delivery_fee = subtotal >= freeDeliveryThreshold ? 0 : deliveryFeeAmount;
     const total = subtotal + delivery_fee;
     const order_code = makeOrderCode();
     const payment_status = payment_method === 'online' ? 'awaiting_verification' : 'pending';

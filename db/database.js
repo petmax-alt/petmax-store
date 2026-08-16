@@ -80,6 +80,50 @@ async function initSchema() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        slug VARCHAR(100) NOT NULL UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed categories from whatever product categories already exist, so nothing
+    // that's currently live on the storefront silently disappears from this new list.
+    const [existingCats] = await conn.query('SELECT COUNT(*) AS c FROM categories');
+    if (existingCats[0].c === 0) {
+      const [distinctCats] = await conn.query('SELECT DISTINCT category FROM products');
+      for (const row of distinctCats) {
+        const slug = row.category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        await conn.query('INSERT IGNORE INTO categories (name, slug) VALUES (?, ?)', [row.category, slug]);
+      }
+    }
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        setting_key VARCHAR(100) PRIMARY KEY,
+        setting_value TEXT
+      )
+    `);
+
+    // Defaults — these were previously hardcoded placeholders in public/js/main.js
+    const defaults = {
+      whatsapp_number: '923001234567',
+      delivery_fee: '200',
+      free_delivery_threshold: '3000',
+      currency_symbol: 'Rs',
+      bank_account_title: 'Pet Max',
+      bank_jazzcash: '',
+      bank_easypaisa: '',
+      bank_name: '',
+      bank_account: '',
+      bank_iban: '',
+    };
+    for (const [key, value] of Object.entries(defaults)) {
+      await conn.query('INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
+    }
   } finally {
     conn.release();
   }

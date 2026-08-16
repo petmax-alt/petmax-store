@@ -164,6 +164,24 @@ router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
   }
 });
 
+// PATCH /api/products/:id/stock (admin only) — quick +/- from the Inventory view
+router.patch('/:id/stock', requireAdmin, async (req, res) => {
+  try {
+    const { delta } = req.body;
+    if (typeof delta !== 'number') return res.status(400).json({ error: 'delta must be a number' });
+
+    const [existingRows] = await pool.query('SELECT stock FROM products WHERE id = ?', [req.params.id]);
+    if (!existingRows[0]) return res.status(404).json({ error: 'Product not found' });
+
+    const newStock = Math.max(0, existingRows[0].stock + delta);
+    await pool.query('UPDATE products SET stock = ? WHERE id = ?', [newStock, req.params.id]);
+    res.json({ id: Number(req.params.id), stock: newStock });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong adjusting stock.' });
+  }
+});
+
 // DELETE /api/products/:id (admin only)
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {

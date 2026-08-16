@@ -539,7 +539,27 @@ const genericWaText = `Hi Pet Max! I'd like to ask about your products for my ca
 
 // ---------------- Init ----------------
 document.getElementById('year').textContent = new Date().getFullYear();
+async function loadSiteSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const s = await res.json();
+    if (s.whatsapp_number) CONFIG.whatsappNumber = s.whatsapp_number;
+    if (s.delivery_fee) CONFIG.deliveryFee = Number(s.delivery_fee);
+    if (s.free_delivery_threshold) CONFIG.freeDeliveryThreshold = Number(s.free_delivery_threshold);
+    if (s.bank_account_title) CONFIG.bank.accountTitle = s.bank_account_title;
+    if (s.bank_jazzcash) CONFIG.bank.jazzcash = s.bank_jazzcash;
+    if (s.bank_easypaisa) CONFIG.bank.easypaisa = s.bank_easypaisa;
+    if (s.bank_name) CONFIG.bank.bankName = s.bank_name;
+    if (s.bank_account) CONFIG.bank.bankAccount = s.bank_account;
+    if (s.bank_iban) CONFIG.bank.iban = s.bank_iban;
+  } catch (err) {
+    // If this fails, the storefront still works using the hardcoded fallback values above.
+    console.warn('Could not load live settings, using defaults', err);
+  }
+}
+
 (async function init() {
+  await loadSiteSettings();
   await loadCategories();
   await loadProducts();
   renderCartDrawer();

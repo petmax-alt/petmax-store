@@ -839,6 +839,7 @@ h1, h2, h3, h4 {
   gap: 8px;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.toast--error { background: #C23B3B; }
 
 /* ============ Responsive ============ */
 @media (max-width: 980px) {
