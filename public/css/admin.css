@@ -163,6 +163,16 @@ table.admin-table tbody tr:hover { background: var(--cream); }
 .variant-row button { border: none; background: #FCE4E4; color: #C23B3B; border-radius: 8px; width: 30px; height: 30px; font-weight: 700; }
 .variant-row-labels { display: grid; grid-template-columns: 1.4fr 1fr 0.9fr 0.9fr 0.7fr auto; gap: 8px; font-size: 0.7rem; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; margin-bottom: 6px; }
 
+/* Homepage slides manager */
+.slide-thumb { position: relative; width: 160px; border-radius: 10px; overflow: hidden; border: 1px solid var(--sand-line); background: var(--sand); }
+.slide-thumb img { width: 100%; height: 90px; object-fit: cover; display: block; }
+.slide-thumb-body { padding: 8px 10px; }
+.slide-thumb-body b { font-size: 0.78rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slide-thumb-actions { display: flex; gap: 6px; padding: 0 10px 10px; }
+.slide-thumb-actions button { flex: 1; font-size: 0.72rem; padding: 5px 0; border-radius: 6px; border: none; background: var(--white); }
+.slide-thumb-actions button.danger { background: #FCE4E4; color: #C23B3B; }
+.slide-thumb.inactive { opacity: 0.5; }
+
 .coming-soon { padding: 40px 26px; text-align: center; color: var(--ink-soft); font-size: 0.92rem; line-height: 1.6; max-width: 480px; margin: 0 auto; }
 
 .bulk-action-bar {

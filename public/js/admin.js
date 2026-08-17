@@ -180,6 +180,7 @@ async function checkAuth() {
 
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const username = document.getElementById('loginUsername').value;
   const password = document.getElementById('loginPassword').value;
   const errorEl = document.getElementById('loginError');
   errorEl.style.display = 'none';
@@ -187,7 +188,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ username, password }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Login failed');
@@ -223,6 +224,10 @@ document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
     if (btn.dataset.view === 'inventory') renderInventoryTable();
     if (btn.dataset.view === 'customers') { renderCustomersTable(); renderRegisteredCustomersTable(); }
     if (btn.dataset.view === 'blog') renderBlogTable();
+    if (btn.dataset.view === 'analytics') renderAnalytics();
+    if (btn.dataset.view === 'coupons') renderCouponsTable();
+    if (btn.dataset.view === 'users') renderAdminsTable();
+    if (btn.dataset.view === 'settings') renderSlidesGrid();
   });
 });
 
@@ -952,6 +957,292 @@ document.getElementById('blogForm').addEventListener('submit', async (e) => {
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save post';
+  }
+});
+
+// ---------------- Analytics ----------------
+let bestSellersChartInstance = null;
+let categoryRevenueChartInstance = null;
+
+function renderAnalytics() {
+  // Best sellers: aggregate quantity sold per product name across all orders.
+  const soldQty = {};
+  const revenueByCategory = {};
+  const productById = new Map(PRODUCTS.map(p => [p.id, p]));
+
+  for (const order of ORDERS) {
+    for (const item of order.items) {
+      soldQty[item.name] = (soldQty[item.name] || 0) + item.qty;
+      const product = productById.get(item.id);
+      const category = product ? product.category : 'Other';
+      revenueByCategory[category] = (revenueByCategory[category] || 0) + item.price * item.qty;
+    }
+  }
+
+  const topProducts = Object.entries(soldQty).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const bsCtx = document.getElementById('bestSellersChart');
+  if (bestSellersChartInstance) bestSellersChartInstance.destroy();
+  bestSellersChartInstance = new Chart(bsCtx, {
+    type: 'bar',
+    data: { labels: topProducts.map(x => x[0]), datasets: [{ label: 'Units sold', data: topProducts.map(x => x[1]), backgroundColor: '#F4622E' }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+  });
+
+  const catEntries = Object.entries(revenueByCategory);
+  const crCtx = document.getElementById('categoryRevenueChart');
+  if (categoryRevenueChartInstance) categoryRevenueChartInstance.destroy();
+  categoryRevenueChartInstance = new Chart(crCtx, {
+    type: 'doughnut',
+    data: {
+      labels: catEntries.map(x => x[0]),
+      datasets: [{ data: catEntries.map(x => x[1]), backgroundColor: ['#F4622E', '#294061', '#25D366', '#F2A93B', '#C23B3B', '#8E6FF7'] }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } } },
+  });
+
+  const byPhone = {};
+  for (const o of ORDERS) byPhone[o.phone] = (byPhone[o.phone] || 0) + 1;
+  const repeatCount = Object.values(byPhone).filter(c => c > 1).length;
+  const oneTimeCount = Object.values(byPhone).filter(c => c === 1).length;
+  document.getElementById('repeatCustomerStats').innerHTML = `
+    <div class="stat-row" style="margin-bottom:0;">
+      <div class="stat-card"><div class="stat-card-text"><span>Repeat customers</span><b>${repeatCount}</b></div><div class="stat-card-icon icon-green">🔁</div></div>
+      <div class="stat-card"><div class="stat-card-text"><span>One-time customers</span><b>${oneTimeCount}</b></div><div class="stat-card-icon icon-navy">👤</div></div>
+    </div>
+  `;
+}
+
+// ---------------- Coupons ----------------
+async function renderCouponsTable() {
+  const res = await fetch('/api/coupons');
+  const coupons = await res.json();
+  document.getElementById('couponsTableBody').innerHTML = coupons.map(c => {
+    const expired = c.expires_at && new Date(c.expires_at) < new Date();
+    const maxedOut = c.max_uses && c.used_count >= c.max_uses;
+    let statusPill = c.active ? '<span class="pill pill-green">Active</span>' : '<span class="pill pill-gray">Disabled</span>';
+    if (c.active && (expired || maxedOut)) statusPill = `<span class="pill pill-red">${expired ? 'Expired' : 'Limit reached'}</span>`;
+    return `
+      <tr>
+        <td><b>${c.code}</b></td>
+        <td>${c.type === 'percent' ? c.value + '%' : fmt(c.value)}</td>
+        <td>${c.min_order ? fmt(c.min_order) : '—'}</td>
+        <td>${c.used_count}${c.max_uses ? ' / ' + c.max_uses : ''}</td>
+        <td>${c.expires_at ? new Date(c.expires_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+        <td>${statusPill}</td>
+        <td class="row-actions">
+          <button data-toggle-coupon="${c.id}" data-active="${c.active ? 0 : 1}">${c.active ? 'Disable' : 'Enable'}</button>
+          <button class="danger" data-delete-coupon="${c.id}">Delete</button>
+        </td>
+      </tr>
+    `;
+  }).join('') || `<tr><td colspan="7" style="text-align:center; color:var(--ink-soft); padding:30px;">No coupons yet</td></tr>`;
+
+  document.querySelectorAll('[data-toggle-coupon]').forEach(btn => btn.addEventListener('click', async () => {
+    await fetch(`/api/coupons/${btn.dataset.toggleCoupon}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active: btn.dataset.active === '1' }) });
+    renderCouponsTable();
+  }));
+  document.querySelectorAll('[data-delete-coupon]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Delete this coupon?')) return;
+    await fetch(`/api/coupons/${btn.dataset.deleteCoupon}`, { method: 'DELETE' });
+    renderCouponsTable();
+  }));
+}
+
+document.getElementById('addCouponBtn').addEventListener('click', async () => {
+  const code = prompt('Coupon code (e.g. AZADI15):');
+  if (!code) return;
+  const type = confirm('Click OK for a percentage discount, Cancel for a fixed Rs amount off.') ? 'percent' : 'fixed';
+  const value = Number(prompt(type === 'percent' ? 'Discount percentage (e.g. 15):' : 'Discount amount in Rs (e.g. 200):'));
+  if (!value) return;
+  const minOrderInput = prompt('Minimum order amount in Rs (0 for no minimum):', '0');
+  const res = await fetch('/api/coupons', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, type, value, min_order: Number(minOrderInput) || 0 }),
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error, true);
+  toast('Coupon created');
+  renderCouponsTable();
+});
+
+// ---------------- Users / Admins ----------------
+async function renderAdminsTable() {
+  const res = await fetch('/api/auth/admins');
+  const admins = await res.json();
+  document.getElementById('adminsTableBody').innerHTML = admins.map(a => `
+    <tr>
+      <td><b>${a.username}</b></td>
+      <td>${a.role === 'owner' ? '<span class="pill pill-orange">Owner</span>' : '<span class="pill pill-gray">Admin</span>'}</td>
+      <td>${new Date(a.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+      <td class="row-actions">
+        <button data-reset-password="${a.id}">Reset password</button>
+        <button class="danger" data-delete-admin="${a.id}">Delete</button>
+      </td>
+    </tr>
+  `).join('') || `<tr><td colspan="4" style="text-align:center; color:var(--ink-soft); padding:30px;">No admin users</td></tr>`;
+
+  document.querySelectorAll('[data-reset-password]').forEach(btn => btn.addEventListener('click', async () => {
+    const password = prompt('Enter a new password (at least 6 characters):');
+    if (!password) return;
+    const res = await fetch(`/api/auth/admins/${btn.dataset.resetPassword}/password`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
+    });
+    const data = await res.json();
+    if (!res.ok) return toast(data.error, true);
+    toast('Password updated');
+  }));
+  document.querySelectorAll('[data-delete-admin]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Remove this admin user?')) return;
+    const res = await fetch(`/api/auth/admins/${btn.dataset.deleteAdmin}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) return toast(data.error, true);
+    toast('Admin removed');
+    renderAdminsTable();
+  }));
+}
+
+document.getElementById('addAdminBtn').addEventListener('click', async () => {
+  const username = prompt('New admin username:');
+  if (!username) return;
+  const password = prompt('Password (at least 6 characters):');
+  if (!password) return;
+  const res = await fetch('/api/auth/admins', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error, true);
+  toast('Admin user added');
+  renderAdminsTable();
+});
+
+// ---------------- Homepage slides ----------------
+let SLIDES = [];
+let EDITING_SLIDE_ID = null;
+let SLIDE_IMAGE_FILE = null;
+
+async function renderSlidesGrid() {
+  const res = await fetch('/api/slides/admin');
+  SLIDES = await res.json();
+  const grid = document.getElementById('slidesGrid');
+  grid.innerHTML = SLIDES.map(s => `
+    <div class="slide-thumb ${s.active ? '' : 'inactive'}" draggable="true" data-slide-id="${s.id}">
+      <img src="/api/slides/image/${s.id}" alt="${s.heading || 'Slide'}">
+      <div class="slide-thumb-body"><b>${s.heading || '(no heading)'}</b></div>
+      <div class="slide-thumb-actions">
+        <button data-edit-slide="${s.id}">Edit</button>
+        <button class="danger" data-delete-slide="${s.id}">Delete</button>
+      </div>
+    </div>
+  `).join('') || `<p style="color:var(--ink-soft); font-size:0.88rem;">No slides yet — the homepage will show its default hero.</p>`;
+
+  document.querySelectorAll('[data-edit-slide]').forEach(btn => btn.addEventListener('click', () => openSlideForm(Number(btn.dataset.editSlide))));
+  document.querySelectorAll('[data-delete-slide]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Delete this slide?')) return;
+    await fetch(`/api/slides/${btn.dataset.deleteSlide}`, { method: 'DELETE' });
+    renderSlidesGrid();
+  }));
+
+  // Drag to reorder
+  let dragId = null;
+  grid.querySelectorAll('[data-slide-id]').forEach(thumb => {
+    thumb.addEventListener('dragstart', () => { dragId = Number(thumb.dataset.slideId); });
+    thumb.addEventListener('dragover', (e) => e.preventDefault());
+    thumb.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const targetId = Number(thumb.dataset.slideId);
+      if (dragId === null || dragId === targetId) return;
+      const order = SLIDES.map(s => s.id);
+      const fromIdx = order.indexOf(dragId);
+      const toIdx = order.indexOf(targetId);
+      order.splice(fromIdx, 1);
+      order.splice(toIdx, 0, dragId);
+      await fetch('/api/slides/order/all', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order }) });
+      renderSlidesGrid();
+    });
+  });
+}
+
+function openSlideForm(id) {
+  EDITING_SLIDE_ID = id;
+  document.getElementById('slideForm').reset();
+  SLIDE_IMAGE_FILE = null;
+  document.getElementById('slideDropzoneEmpty').hidden = false;
+  document.getElementById('slideDropzonePreview').hidden = true;
+  document.getElementById('slideFormError').style.display = 'none';
+
+  if (id) {
+    const s = SLIDES.find(x => x.id === id);
+    document.getElementById('slideModalTitle').textContent = 'Edit slide';
+    document.getElementById('sf_heading').value = s.heading || '';
+    document.getElementById('sf_subheading').value = s.subheading || '';
+    document.getElementById('sf_link').value = s.link_url || '';
+    document.getElementById('slidePreviewImg').src = `/api/slides/image/${s.id}`;
+    document.getElementById('slideDropzoneEmpty').hidden = true;
+    document.getElementById('slideDropzonePreview').hidden = false;
+  } else {
+    document.getElementById('slideModalTitle').textContent = 'Add slide';
+  }
+  document.getElementById('slideModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+document.getElementById('addSlideBtn').addEventListener('click', () => openSlideForm(null));
+
+const slideDropzone = document.getElementById('slideDropzone');
+const slideFileInput = document.getElementById('sf_image');
+slideDropzone.addEventListener('click', () => slideFileInput.click());
+function handleSlideFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  SLIDE_IMAGE_FILE = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('slidePreviewImg').src = e.target.result;
+    document.getElementById('slideDropzoneEmpty').hidden = true;
+    document.getElementById('slideDropzonePreview').hidden = false;
+  };
+  reader.readAsDataURL(file);
+}
+slideFileInput.addEventListener('change', () => handleSlideFile(slideFileInput.files[0]));
+['dragover', 'dragenter'].forEach(evt => slideDropzone.addEventListener(evt, (e) => { e.preventDefault(); slideDropzone.classList.add('dragover'); }));
+['dragleave', 'drop'].forEach(evt => slideDropzone.addEventListener(evt, (e) => { e.preventDefault(); slideDropzone.classList.remove('dragover'); }));
+slideDropzone.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) handleSlideFile(f); });
+
+document.getElementById('slideForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('slideFormError');
+  errorEl.style.display = 'none';
+
+  if (!EDITING_SLIDE_ID && !SLIDE_IMAGE_FILE) {
+    errorEl.textContent = 'Please choose an image for this slide.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('heading', document.getElementById('sf_heading').value.trim());
+  formData.append('subheading', document.getElementById('sf_subheading').value.trim());
+  formData.append('link_url', document.getElementById('sf_link').value.trim());
+  if (SLIDE_IMAGE_FILE) formData.append('image', SLIDE_IMAGE_FILE);
+
+  const saveBtn = document.getElementById('slideSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  try {
+    const url = EDITING_SLIDE_ID ? `/api/slides/${EDITING_SLIDE_ID}` : '/api/slides';
+    const method = EDITING_SLIDE_ID ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save slide');
+    document.getElementById('slideModal').classList.remove('open');
+    document.body.style.overflow = '';
+    toast(EDITING_SLIDE_ID ? 'Slide updated' : 'Slide added');
+    renderSlidesGrid();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save slide';
   }
 });
 

@@ -106,6 +106,8 @@ function renderGrid() {
       toast(`${product.name} added to cart`);
     });
   });
+
+  initScrollAnimations(); // re-observe: this grid just replaced its contents with new [data-animate] cards
 }
 
 function productCardHTML(p) {
@@ -115,7 +117,7 @@ function productCardHTML(p) {
     ? `<span class="product-badge ${p.badge === 'New' ? 'badge-new' : ''}">${p.badge}</span>`
     : '';
   return `
-  <div class="product-card">
+  <div class="product-card" data-animate="fade">
     <div class="product-media accent-${p.accent}" data-quickview="${p.id}">
       ${badge}
       ${p.has_image ? `<img src="/api/products/image/${p.id}" alt="${p.name}" class="product-photo">` : getProductIcon(p.icon, p.accent)}
@@ -149,10 +151,38 @@ async function openQuickView(id) {
 
   const body = document.getElementById('quickViewBody');
   let selectedVariant = p.has_variants ? p.variants.find(v => v.stock > 0) || p.variants[0] : null;
+  let activeImageIdx = 0;
+  const galleryImages = p.images && p.images.length ? p.images : (p.has_image ? [{ id: p.id, legacy: true }] : []);
 
   function currentPrice() { return selectedVariant ? selectedVariant.price : p.price; }
   function currentStock() { return selectedVariant ? selectedVariant.stock : p.stock; }
   function currentOutOfStock() { return currentStock() <= 0; }
+
+  function imageSrc(img) {
+    return img.legacy ? `/api/products/image/${img.id}` : `/api/products/images/${img.id}`;
+  }
+
+  function galleryHTML() {
+    if (galleryImages.length === 0) {
+      return `<div class="qv-media accent-${p.accent}">${getProductIcon(p.icon, p.accent)}</div>`;
+    }
+    return `
+      <div class="qv-gallery">
+        <div class="qv-media accent-${p.accent} qv-media--photo">
+          <img src="${imageSrc(galleryImages[activeImageIdx])}" alt="${p.name}" class="product-photo qv-active-photo" key="${activeImageIdx}">
+        </div>
+        ${galleryImages.length > 1 ? `
+          <div class="qv-thumbs">
+            ${galleryImages.map((img, i) => `
+              <button type="button" class="qv-thumb ${i === activeImageIdx ? 'active' : ''}" data-thumb="${i}">
+                <img src="${imageSrc(img)}" alt="Photo ${i + 1}">
+              </button>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
 
   function variantPickerHTML() {
     if (!p.has_variants) return '';
@@ -167,7 +197,7 @@ async function openQuickView(id) {
   function render() {
     const outOfStock = currentOutOfStock();
     body.innerHTML = `
-      <div class="qv-media accent-${p.accent}">${p.has_image ? `<img src="/api/products/image/${p.id}" alt="${p.name}" class="product-photo">` : getProductIcon(p.icon, p.accent)}</div>
+      ${galleryHTML()}
       <div class="qv-info">
         <span class="product-category">${p.category}</span>
         <h2>${p.name}</h2>
@@ -194,6 +224,13 @@ async function openQuickView(id) {
           <a class="btn btn--whatsapp" id="qvWhatsapp" href="#" target="_blank" rel="noopener">Order on WhatsApp</a>
         </div>
       </div>`;
+
+    body.querySelectorAll('[data-thumb]').forEach(thumb => {
+      thumb.addEventListener('click', () => {
+        activeImageIdx = Number(thumb.dataset.thumb);
+        render();
+      });
+    });
 
     body.querySelectorAll('[data-variant]').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -480,7 +517,22 @@ function renderCheckoutForm() {
   const items = Cart.getItems();
   const subtotal = Cart.subtotal();
   const delivery = subtotal >= CONFIG.freeDeliveryThreshold ? 0 : CONFIG.deliveryFee;
-  const total = subtotal + delivery;
+  let appliedCoupon = null; // { code, discount }
+
+  function currentTotal() {
+    return Math.max(0, subtotal + delivery - (appliedCoupon ? appliedCoupon.discount : 0));
+  }
+
+  function renderSummary() {
+    const summaryEl = body.querySelector('.checkout-summary');
+    summaryEl.innerHTML = `
+      <div class="summary-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+      <div class="summary-row"><span>Delivery</span><span>${delivery === 0 ? 'Free' : fmt(delivery)}</span></div>
+      ${appliedCoupon ? `<div class="summary-row" style="color:#1DAE55;"><span>Coupon (${appliedCoupon.code})</span><span>−${fmt(appliedCoupon.discount)}</span></div>` : ''}
+      <div class="summary-row total"><span>Total</span><span>${fmt(currentTotal())}</span></div>
+    `;
+    body.querySelector('#placeOrderBtn').textContent = `Place order — ${fmt(currentTotal())}`;
+  }
 
   body.innerHTML = `
     <h2>Checkout</h2>
@@ -536,17 +588,49 @@ function renderCheckoutForm() {
         </div>
       </div>
 
+      <div class="form-field full">
+        <label for="ck_coupon">Coupon code (optional)</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="ck_coupon" placeholder="e.g. AZADI15" style="text-transform:uppercase;">
+          <button type="button" class="btn btn--ghost" id="applyCouponBtn" style="flex:none;">Apply</button>
+        </div>
+        <p id="couponMsg" style="font-size:0.82rem; margin-top:6px;"></p>
+      </div>
+
       <div class="checkout-summary">
         <div class="summary-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
         <div class="summary-row"><span>Delivery</span><span>${delivery === 0 ? 'Free' : fmt(delivery)}</span></div>
-        <div class="summary-row total"><span>Total</span><span>${fmt(total)}</span></div>
+        <div class="summary-row total"><span>Total</span><span>${fmt(currentTotal())}</span></div>
       </div>
 
       <p class="field-error" id="checkoutError" style="display:none; margin-bottom:12px;"></p>
 
-      <button type="submit" class="btn btn--primary btn--block" id="placeOrderBtn">Place order — ${fmt(total)}</button>
+      <button type="submit" class="btn btn--primary btn--block" id="placeOrderBtn">Place order — ${fmt(currentTotal())}</button>
     </form>
   `;
+
+  body.querySelector('#applyCouponBtn').addEventListener('click', async () => {
+    const code = document.getElementById('ck_coupon').value.trim();
+    const msgEl = document.getElementById('couponMsg');
+    if (!code) return;
+    try {
+      const res = await fetch('/api/coupons/validate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotal }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      appliedCoupon = { code: data.code, discount: data.discount };
+      msgEl.style.color = '#1DAE55';
+      msgEl.textContent = `Coupon applied — you saved ${fmt(data.discount)}`;
+      renderSummary();
+    } catch (err) {
+      appliedCoupon = null;
+      msgEl.style.color = '#C23B3B';
+      msgEl.textContent = err.message;
+      renderSummary();
+    }
+  });
 
   let paymentMethod = 'cod';
   body.querySelectorAll('.pay-option').forEach(opt => {
@@ -572,6 +656,7 @@ function renderCheckoutForm() {
       payment_method: paymentMethod,
       transaction_id: paymentMethod === 'online' ? document.getElementById('ck_txn').value.trim() : null,
       items: items.map(i => ({ id: i.id, qty: i.qty, variant_id: i.variant_id || null })),
+      coupon_code: appliedCoupon ? appliedCoupon.code : null,
     };
 
     const btn = document.getElementById('placeOrderBtn');
@@ -732,10 +817,74 @@ async function loadSiteSettings() {
   }
 }
 
+async function loadCarousel() {
+  const res = await fetch('/api/slides');
+  const slides = await res.json();
+  if (slides.length === 0) return; // keep it hidden — no slides configured, nothing changes visually
+
+  const section = document.getElementById('homepageCarousel');
+  const track = document.getElementById('carouselTrack');
+  const dotsWrap = document.getElementById('carouselDots');
+  let current = 0;
+  let timer = null;
+
+  track.innerHTML = slides.map(s => `
+    <div class="carousel-slide">
+      ${s.link_url ? `<a href="${s.link_url}">` : ''}
+      <img src="/api/slides/image/${s.id}" alt="${s.heading || 'Pet Max'}">
+      ${(s.heading || s.subheading) ? `<div class="carousel-slide-copy">${s.heading ? `<h2>${s.heading}</h2>` : ''}${s.subheading ? `<p>${s.subheading}</p>` : ''}</div>` : ''}
+      ${s.link_url ? `</a>` : ''}
+    </div>
+  `).join('');
+  dotsWrap.innerHTML = slides.map((_, i) => `<button data-dot="${i}" class="${i === 0 ? 'active' : ''}"></button>`).join('');
+
+  function goTo(i) {
+    current = (i + slides.length) % slides.length;
+    track.style.transform = `translateX(-${current * 100}%)`;
+    dotsWrap.querySelectorAll('button').forEach((d, idx) => d.classList.toggle('active', idx === current));
+  }
+  function restartAutoplay() {
+    clearInterval(timer);
+    if (slides.length > 1) timer = setInterval(() => goTo(current + 1), 5000);
+  }
+
+  dotsWrap.querySelectorAll('[data-dot]').forEach(dot => dot.addEventListener('click', () => { goTo(Number(dot.dataset.dot)); restartAutoplay(); }));
+  document.getElementById('carouselPrev').addEventListener('click', () => { goTo(current - 1); restartAutoplay(); });
+  document.getElementById('carouselNext').addEventListener('click', () => { goTo(current + 1); restartAutoplay(); });
+  if (slides.length <= 1) {
+    document.getElementById('carouselPrev').hidden = true;
+    document.getElementById('carouselNext').hidden = true;
+    dotsWrap.hidden = true;
+  }
+
+  section.hidden = false;
+  restartAutoplay();
+}
+
+// ---------------- Scroll-in animations ----------------
+function initScrollAnimations() {
+  const targets = document.querySelectorAll('[data-animate]');
+  if (!('IntersectionObserver' in window) || targets.length === 0) {
+    targets.forEach(el => el.classList.add('in-view')); // no-JS/old-browser fallback: just show everything
+    return;
+  }
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  targets.forEach(el => observer.observe(el));
+}
+
 (async function init() {
   await loadSiteSettings();
   await loadCurrentCustomer();
   await loadCategories();
   await loadProducts();
+  await loadCarousel();
   renderCartDrawer();
+  initScrollAnimations();
 })();

@@ -15,7 +15,7 @@ const DEFAULT_FREE_DELIVERY_THRESHOLD = 3000;
 
 // POST /api/orders — place a new order (COD or online)
 router.post('/', async (req, res) => {
-  const { customer_name, phone, address, city, notes, payment_method, transaction_id, items } = req.body;
+  const { customer_name, phone, address, city, notes, payment_method, transaction_id, items, coupon_code } = req.body;
 
   if (!customer_name || !phone || !address || !city) {
     return res.status(400).json({ error: 'Name, phone, address and city are required.' });
@@ -83,14 +83,42 @@ router.post('/', async (req, res) => {
     const freeDeliveryThreshold = Number(settingsMap.free_delivery_threshold ?? DEFAULT_FREE_DELIVERY_THRESHOLD);
 
     const delivery_fee = subtotal >= freeDeliveryThreshold ? 0 : deliveryFeeAmount;
-    const total = subtotal + delivery_fee;
+
+    // Re-validate the coupon server-side too — never trust a discount amount from the client.
+    let discount_amount = 0;
+    let appliedCouponCode = null;
+    if (coupon_code) {
+      const [couponRows] = await conn.query('SELECT * FROM coupons WHERE code = ? FOR UPDATE', [coupon_code.trim().toUpperCase()]);
+      const coupon = couponRows[0];
+      if (!coupon || !coupon.active) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Invalid coupon code' });
+      }
+      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'This coupon has expired' });
+      }
+      if (coupon.max_uses && coupon.used_count >= coupon.max_uses) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'This coupon has reached its usage limit' });
+      }
+      if (subtotal < coupon.min_order) {
+        await conn.rollback();
+        return res.status(400).json({ error: `This coupon needs a minimum order of Rs ${coupon.min_order}` });
+      }
+      discount_amount = coupon.type === 'percent' ? Math.round(subtotal * coupon.value / 100) : Math.min(coupon.value, subtotal);
+      appliedCouponCode = coupon.code;
+      await conn.query('UPDATE coupons SET used_count = used_count + 1 WHERE id = ?', [coupon.id]);
+    }
+
+    const total = Math.max(0, subtotal + delivery_fee - discount_amount);
     const order_code = makeOrderCode();
     const payment_status = payment_method === 'online' ? 'awaiting_verification' : 'pending';
 
     const [info] = await conn.query(`
-      INSERT INTO orders (order_code, customer_name, phone, address, city, notes, payment_method, payment_status, transaction_id, items, subtotal, delivery_fee, total, customer_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [order_code, customer_name, phone, address, city, notes || '', payment_method || 'cod', payment_status, transaction_id || null, JSON.stringify(verifiedItems), subtotal, delivery_fee, total, (req.session && req.session.customerId) || null]);
+      INSERT INTO orders (order_code, customer_name, phone, address, city, notes, payment_method, payment_status, transaction_id, items, subtotal, delivery_fee, total, customer_id, coupon_code, discount_amount)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [order_code, customer_name, phone, address, city, notes || '', payment_method || 'cod', payment_status, transaction_id || null, JSON.stringify(verifiedItems), subtotal, delivery_fee, total, (req.session && req.session.customerId) || null, appliedCouponCode, discount_amount]);
 
     for (const it of verifiedItems) {
       if (it.variant_id) {

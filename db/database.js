@@ -223,6 +223,70 @@ async function initSchema() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS coupons (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(50) NOT NULL UNIQUE,
+        type VARCHAR(20) NOT NULL DEFAULT 'percent',
+        value INT NOT NULL,
+        min_order INT NOT NULL DEFAULT 0,
+        max_uses INT,
+        used_count INT NOT NULL DEFAULT 0,
+        expires_at TIMESTAMP NULL,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Migration: attach any applied coupon to an order for the admin order table.
+    const [couponCol] = await conn.query(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'coupon_code'
+    `);
+    if (couponCol.length === 0) {
+      await conn.query('ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50) NULL');
+      await conn.query('ALTER TABLE orders ADD COLUMN discount_amount INT NOT NULL DEFAULT 0');
+    }
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS admins (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(100) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        password_salt VARCHAR(64) NOT NULL,
+        role VARCHAR(20) NOT NULL DEFAULT 'admin',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Bootstrap: migrate the single shared ADMIN_PASSWORD env var into a real
+    // admin account the first time this runs, so existing logins keep working.
+    const [adminCount] = await conn.query('SELECT COUNT(*) AS c FROM admins');
+    if (adminCount[0].c === 0) {
+      const crypto = require('crypto');
+      const salt = crypto.randomBytes(16).toString('hex');
+      const password = process.env.ADMIN_PASSWORD || 'petmax2026';
+      const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+      await conn.query(
+        'INSERT INTO admins (username, password_hash, password_salt, role) VALUES (?, ?, ?, ?)',
+        ['admin', hash, salt, 'owner']
+      );
+    }
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS homepage_slides (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        image_data LONGBLOB NOT NULL,
+        image_mime VARCHAR(100) NOT NULL,
+        heading VARCHAR(255),
+        subheading VARCHAR(500),
+        link_url VARCHAR(500),
+        sort_order INT NOT NULL DEFAULT 0,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
   } finally {
     conn.release();
   }

@@ -24,6 +24,8 @@ app.use('/api/categories', require('./routes/categories'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/customers', require('./routes/customers').router);
 app.use('/api/blog', require('./routes/blog'));
+app.use('/api/coupons', require('./routes/coupons'));
+app.use('/api/slides', require('./routes/slides'));
 
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res) => {
