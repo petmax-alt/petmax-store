@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog — Pet Max</title>
+<meta name="description" content="Cat care tips, product guides, and news from Pet Max.">
+<link rel="icon" href="/images/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="brand">
+      <img src="/images/logo.png" alt="Pet Max logo">
+      <span class="brand-name">PET MAX<span>Tech made simple, tails made happy</span></span>
+    </a>
+    <nav class="main-nav">
+      <a href="/#shop">Shop</a>
+      <a href="/#categories">Categories</a>
+      <a href="/#about">Why Pet Max</a>
+      <a href="/blog" class="active">Blog</a>
+      <a href="/admin">Admin</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" id="cartBtn" aria-label="Open cart" onclick="location.href='/'">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<section class="blog-hero">
+  <div class="blog-hero-inner">
+    <h1>The Pet Max Blog</h1>
+    <p>Cat care tips, product guides, and news from the Pet Max team.</p>
+  </div>
+</section>
+
+<main class="blog-listing-wrap">
+  <div id="blogList" class="blog-grid">
+    <p style="color:var(--ink-soft); grid-column:1/-1; text-align:center; padding:60px 0;">Loading posts…</p>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <img src="/images/logo.png" alt="Pet Max">
+      <p>A Pakistan-based pet supplies store for cat food, treats, litter, grooming and toys — Cash on Delivery or online payment, delivered to your door.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Shop</h4>
+      <ul>
+        <li><a href="/#shop">Cat Food</a></li>
+        <li><a href="/#shop">Cat Treats</a></li>
+        <li><a href="/#shop">Litter & Accessories</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Help</h4>
+      <ul>
+        <li><a href="/blog">Blog</a></li>
+        <li><a href="/admin">Store admin</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© <span id="year"></span> Pet Max. Made for cats, run from Lahore.</span>
+  </div>
+</footer>
+
+<script>
+document.getElementById('year').textContent = new Date().getFullYear();
+
+async function loadPosts() {
+  const res = await fetch('/api/blog');
+  const posts = await res.json();
+  const list = document.getElementById('blogList');
+  if (posts.length === 0) {
+    list.innerHTML = `<p style="color:var(--ink-soft); grid-column:1/-1; text-align:center; padding:60px 0;">No posts yet — check back soon.</p>`;
+    return;
+  }
+  list.innerHTML = posts.map(p => `
+    <a href="/blog/${p.slug}" class="blog-card">
+      <div class="blog-card-media">${p.has_cover_image ? `<img src="/api/blog/image/${p.id}" alt="${p.title}">` : '<div class="blog-card-placeholder">🐾</div>'}</div>
+      <div class="blog-card-body">
+        <span class="blog-card-date">${new Date(p.published_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+        <h2>${p.title}</h2>
+        <p>${p.excerpt || ''}</p>
+      </div>
+    </a>
+  `).join('');
+}
+loadPosts();
+</script>
+</body>
+</html>

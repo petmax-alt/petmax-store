@@ -210,7 +210,7 @@ function showAdmin() {
 }
 
 // ---------------- Nav ----------------
-const ALL_VIEWS = ['dashboard', 'orders', 'products', 'categories', 'inventory', 'customers', 'coupons', 'analytics', 'settings', 'users'];
+const ALL_VIEWS = ['dashboard', 'orders', 'products', 'categories', 'inventory', 'customers', 'coupons', 'analytics', 'blog', 'settings', 'users'];
 
 document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -222,6 +222,7 @@ document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
     if (btn.dataset.view === 'categories') renderCategoriesTable();
     if (btn.dataset.view === 'inventory') renderInventoryTable();
     if (btn.dataset.view === 'customers') { renderCustomersTable(); renderRegisteredCustomersTable(); }
+    if (btn.dataset.view === 'blog') renderBlogTable();
   });
 });
 
@@ -487,6 +488,11 @@ async function loadSettingsForm() {
   document.getElementById('st_bank_name').value = s.bank_name || '';
   document.getElementById('st_bank_account').value = s.bank_account || '';
   document.getElementById('st_iban').value = s.bank_iban || '';
+  document.getElementById('st_hero_heading').value = s.hero_heading || '';
+  document.getElementById('st_hero_subheading').value = s.hero_subheading || '';
+  document.getElementById('st_hero_cta').value = s.hero_cta_text || '';
+  document.getElementById('st_banner_text').value = s.banner_text || '';
+  document.getElementById('st_banner_link').value = s.banner_link || '';
 }
 
 document.getElementById('settingsForm').addEventListener('submit', async (e) => {
@@ -509,6 +515,11 @@ document.getElementById('settingsForm').addEventListener('submit', async (e) => 
         bank_name: document.getElementById('st_bank_name').value.trim(),
         bank_account: document.getElementById('st_bank_account').value.trim(),
         bank_iban: document.getElementById('st_iban').value.trim(),
+        hero_heading: document.getElementById('st_hero_heading').value.trim(),
+        hero_subheading: document.getElementById('st_hero_subheading').value.trim(),
+        hero_cta_text: document.getElementById('st_hero_cta').value.trim(),
+        banner_text: document.getElementById('st_banner_text').value.trim(),
+        banner_link: document.getElementById('st_banner_link').value.trim(),
       }),
     });
     if (!res.ok) throw new Error('Could not save settings');
@@ -798,5 +809,150 @@ function renderOrdersTable() {
     });
   });
 }
+
+// ---------------- Blog ----------------
+let BLOG_POSTS = [];
+let EDITING_POST_ID = null;
+let BLOG_COVER_FILE = null;
+let BLOG_REMOVE_COVER = false;
+
+const blogContentEditor = new Quill('#bf_content_editor', {
+  theme: 'snow',
+  placeholder: 'Write your post…',
+  modules: {
+    toolbar: [
+      [{ header: [2, 3, false] }],
+      ['bold', 'italic', 'underline'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['link'], ['clean'],
+    ],
+  },
+});
+blogContentEditor.on('text-change', () => {
+  document.getElementById('bf_content').value = blogContentEditor.root.innerHTML;
+});
+
+async function renderBlogTable() {
+  const res = await fetch('/api/blog/admin');
+  BLOG_POSTS = await res.json();
+  document.getElementById('blogTableBody').innerHTML = BLOG_POSTS.map(p => `
+    <tr>
+      <td><div class="admin-thumb">${p.has_cover_image ? `<img src="/api/blog/image/${p.id}" alt="${p.title}">` : '📝'}</div></td>
+      <td><b>${p.title}</b></td>
+      <td>${p.status === 'published' ? '<span class="pill pill-green">Published</span>' : '<span class="pill pill-gray">Draft</span>'}</td>
+      <td>${p.published_at ? new Date(p.published_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+      <td>
+        <div class="row-actions">
+          <button data-edit-post="${p.id}">Edit</button>
+          <button class="danger" data-delete-post="${p.id}">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('') || `<tr><td colspan="5" style="text-align:center; color:var(--ink-soft); padding:30px;">No posts yet — click "New post" to write your first one.</td></tr>`;
+
+  document.querySelectorAll('[data-edit-post]').forEach(btn => btn.addEventListener('click', () => openBlogForm(Number(btn.dataset.editPost))));
+  document.querySelectorAll('[data-delete-post]').forEach(btn => btn.addEventListener('click', async () => {
+    const post = BLOG_POSTS.find(p => p.id === Number(btn.dataset.deletePost));
+    if (!confirm(`Delete "${post.title}"? This can't be undone.`)) return;
+    const res = await fetch(`/api/blog/${post.id}`, { method: 'DELETE' });
+    if (!res.ok) return toast('Could not delete post', true);
+    toast('Post deleted');
+    renderBlogTable();
+  }));
+}
+
+function openBlogForm(id) {
+  EDITING_POST_ID = id;
+  document.getElementById('blogForm').reset();
+  blogContentEditor.setContents([]);
+  BLOG_COVER_FILE = null;
+  BLOG_REMOVE_COVER = false;
+  document.getElementById('blogDropzoneEmpty').hidden = false;
+  document.getElementById('blogDropzonePreview').hidden = true;
+  document.getElementById('blogFormError').style.display = 'none';
+
+  if (id) {
+    const p = BLOG_POSTS.find(x => x.id === id);
+    document.getElementById('blogModalTitle').textContent = 'Edit post';
+    document.getElementById('bf_title').value = p.title;
+    document.getElementById('bf_excerpt').value = p.excerpt || '';
+    document.getElementById('bf_status').value = p.status;
+    if (p.content) blogContentEditor.root.innerHTML = p.content;
+    document.getElementById('bf_content').value = p.content || '';
+    if (p.has_cover_image) {
+      document.getElementById('blogPreviewImg').src = `/api/blog/image/${p.id}`;
+      document.getElementById('blogDropzoneEmpty').hidden = true;
+      document.getElementById('blogDropzonePreview').hidden = false;
+    }
+  } else {
+    document.getElementById('blogModalTitle').textContent = 'New post';
+  }
+  document.getElementById('blogModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+document.getElementById('addPostBtn').addEventListener('click', () => openBlogForm(null));
+
+const blogDropzone = document.getElementById('blogDropzone');
+const blogFileInput = document.getElementById('bf_cover');
+blogDropzone.addEventListener('click', () => blogFileInput.click());
+function handleBlogCoverFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  BLOG_COVER_FILE = file;
+  BLOG_REMOVE_COVER = false;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('blogPreviewImg').src = e.target.result;
+    document.getElementById('blogDropzoneEmpty').hidden = true;
+    document.getElementById('blogDropzonePreview').hidden = false;
+  };
+  reader.readAsDataURL(file);
+}
+blogFileInput.addEventListener('change', () => handleBlogCoverFile(blogFileInput.files[0]));
+['dragover', 'dragenter'].forEach(evt => blogDropzone.addEventListener(evt, (e) => { e.preventDefault(); blogDropzone.classList.add('dragover'); }));
+['dragleave', 'drop'].forEach(evt => blogDropzone.addEventListener(evt, (e) => { e.preventDefault(); blogDropzone.classList.remove('dragover'); }));
+blogDropzone.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) handleBlogCoverFile(f); });
+document.getElementById('blogImageRemoveBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  BLOG_COVER_FILE = null;
+  BLOG_REMOVE_COVER = true;
+  blogFileInput.value = '';
+  document.getElementById('blogDropzoneEmpty').hidden = false;
+  document.getElementById('blogDropzonePreview').hidden = true;
+});
+
+document.getElementById('blogForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('blogFormError');
+  errorEl.style.display = 'none';
+
+  const formData = new FormData();
+  formData.append('title', document.getElementById('bf_title').value.trim());
+  formData.append('excerpt', document.getElementById('bf_excerpt').value.trim());
+  formData.append('content', document.getElementById('bf_content').value);
+  formData.append('status', document.getElementById('bf_status').value);
+  if (BLOG_COVER_FILE) formData.append('cover_image', BLOG_COVER_FILE);
+
+  const saveBtn = document.getElementById('blogSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  try {
+    const url = EDITING_POST_ID ? `/api/blog/${EDITING_POST_ID}` : '/api/blog';
+    const method = EDITING_POST_ID ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save post');
+    document.getElementById('blogModal').classList.remove('open');
+    document.body.style.overflow = '';
+    toast(EDITING_POST_ID ? 'Post updated' : 'Post created');
+    renderBlogTable();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save post';
+  }
+});
 
 checkAuth();

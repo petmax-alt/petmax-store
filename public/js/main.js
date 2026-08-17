@@ -716,6 +716,16 @@ async function loadSiteSettings() {
     if (s.bank_name) CONFIG.bank.bankName = s.bank_name;
     if (s.bank_account) CONFIG.bank.bankAccount = s.bank_account;
     if (s.bank_iban) CONFIG.bank.iban = s.bank_iban;
+
+    // Homepage content — only override the default markup if the admin actually set something.
+    if (s.hero_heading) document.getElementById('heroHeading').textContent = s.hero_heading;
+    if (s.hero_subheading) document.getElementById('heroSubheading').textContent = s.hero_subheading;
+    if (s.hero_cta_text) document.getElementById('heroCtaBtn').textContent = s.hero_cta_text;
+    if (s.banner_text) {
+      const banner = document.getElementById('siteBanner');
+      banner.hidden = false;
+      banner.innerHTML = s.banner_link ? `<a href="${s.banner_link}">${s.banner_text}</a>` : s.banner_text;
+    }
   } catch (err) {
     // If this fails, the storefront still works using the hardcoded fallback values above.
     console.warn('Could not load live settings, using defaults', err);

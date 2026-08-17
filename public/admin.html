@@ -45,6 +45,7 @@
     <button class="admin-nav-item" data-view="customers">👤 Customers</button>
     <button class="admin-nav-item" data-view="coupons">🎟️ Coupons</button>
     <button class="admin-nav-item" data-view="analytics">📈 Analytics</button>
+    <button class="admin-nav-item" data-view="blog">📝 Blog</button>
     <button class="admin-nav-item" data-view="settings">⚙️ Store Settings</button>
     <button class="admin-nav-item" data-view="users">🔑 Users/Admins</button>
     <div class="admin-nav-spacer"></div>
@@ -197,6 +198,23 @@
       <div class="admin-card"><div class="coming-soon">📈 Deeper analytics (best sellers, repeat customers, revenue by category) is next on the build list.</div></div>
     </section>
 
+    <!-- Blog view -->
+    <section id="view-blog" hidden>
+      <div class="admin-topbar">
+        <div>
+          <h1>Blog</h1>
+          <p>Write posts for your storefront's blog.</p>
+        </div>
+        <button class="btn btn--primary" id="addPostBtn">+ New post</button>
+      </div>
+      <div class="admin-card">
+        <table class="admin-table">
+          <thead><tr><th></th><th>Title</th><th>Status</th><th>Published</th><th></th></tr></thead>
+          <tbody id="blogTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- Settings view -->
     <section id="view-settings" hidden>
       <div class="admin-topbar">
@@ -249,6 +267,29 @@
           <div class="form-field">
             <label for="st_iban">IBAN</label>
             <input type="text" id="st_iban" placeholder="PK00MEZN0000000123456789">
+          </div>
+          <div class="form-field full" style="border-top:1px solid var(--sand-line); margin-top:6px; padding-top:16px;">
+            <label>Homepage content</label>
+          </div>
+          <div class="form-field full">
+            <label for="st_hero_heading">Hero heading</label>
+            <input type="text" id="st_hero_heading" placeholder="Everything your cat needs, delivered.">
+          </div>
+          <div class="form-field full">
+            <label for="st_hero_subheading">Hero subheading</label>
+            <input type="text" id="st_hero_subheading">
+          </div>
+          <div class="form-field">
+            <label for="st_hero_cta">Hero button text</label>
+            <input type="text" id="st_hero_cta" placeholder="Shop now">
+          </div>
+          <div class="form-field">
+            <label for="st_banner_link">Announcement bar link (optional)</label>
+            <input type="text" id="st_banner_link" placeholder="/#shop">
+          </div>
+          <div class="form-field full">
+            <label for="st_banner_text">Announcement bar text <span style="font-weight:400; color:var(--ink-soft);">(leave empty to hide the bar)</span></label>
+            <input type="text" id="st_banner_text" placeholder="e.g. Independence Day Sale — 15% off this week!">
           </div>
           <div class="admin-form-actions">
             <button type="submit" class="btn btn--primary" id="settingsSaveBtn">Save settings</button>
@@ -349,6 +390,52 @@
       <div class="admin-form-actions">
         <button type="button" class="btn btn--ghost" data-close-modal>Cancel</button>
         <button type="submit" class="btn btn--primary" id="productSaveBtn">Save product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="blogModal">
+  <div class="modal-backdrop" data-close-modal></div>
+  <div class="modal-panel" style="max-width:640px;">
+    <button class="modal-close" data-close-modal>✕</button>
+    <h2 style="padding:28px 30px 0;" id="blogModalTitle">New post</h2>
+    <form id="blogForm" class="admin-form-grid">
+      <div class="form-field full">
+        <label for="bf_title">Title</label>
+        <input type="text" id="bf_title" required>
+      </div>
+      <div class="form-field full">
+        <label>Cover image</label>
+        <div class="image-dropzone" id="blogDropzone">
+          <div class="image-dropzone-empty" id="blogDropzoneEmpty"><span>📷 Drag a cover photo here, or click to browse</span></div>
+          <div class="image-dropzone-preview" id="blogDropzonePreview" hidden>
+            <img id="blogPreviewImg" alt="Cover preview">
+            <button type="button" class="btn btn--ghost" id="blogImageRemoveBtn">Remove photo</button>
+          </div>
+          <input type="file" id="bf_cover" accept="image/*" hidden>
+        </div>
+      </div>
+      <div class="form-field full">
+        <label for="bf_excerpt">Excerpt <span style="font-weight:400; color:var(--ink-soft);">(short summary shown on the blog listing)</span></label>
+        <textarea id="bf_excerpt" rows="2" maxlength="300"></textarea>
+      </div>
+      <div class="form-field full">
+        <label for="bf_content">Content</label>
+        <div id="bf_content_editor"></div>
+        <input type="hidden" id="bf_content">
+      </div>
+      <div class="form-field">
+        <label for="bf_status">Status</label>
+        <select id="bf_status">
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
+        </select>
+      </div>
+      <p class="field-error" id="blogFormError" style="display:none; grid-column:1/-1;"></p>
+      <div class="admin-form-actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Cancel</button>
+        <button type="submit" class="btn btn--primary" id="blogSaveBtn">Save post</button>
       </div>
     </form>
   </div>

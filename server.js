@@ -23,6 +23,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/categories', require('./routes/categories'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/customers', require('./routes/customers').router);
+app.use('/api/blog', require('./routes/blog'));
 
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res) => {
@@ -34,6 +35,14 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/blog', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'blog.html'));
+});
+
+app.get('/blog/:slug', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'blog-post.html'));
 });
 
 app.use((req, res) => {

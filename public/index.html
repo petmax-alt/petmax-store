@@ -25,6 +25,7 @@
       <a href="#shop">Shop</a>
       <a href="#categories">Categories</a>
       <a href="#about">Why Pet Max</a>
+      <a href="/blog">Blog</a>
       <a href="/admin">Admin</a>
     </nav>
 
@@ -49,10 +50,10 @@
   <div class="hero-inner">
     <div class="hero-copy">
       <span class="hero-eyebrow"><span class="paw"></span> Pakistan-wide delivery · COD available</span>
-      <h1>Everything your cat needs, <em>nothing they don't.</em></h1>
-      <p>Food, treats, litter and grooming picked for cats in Pakistani homes — ordered in a minute, paid for on your doorstep, or in advance if you'd rather.</p>
+      <h1 id="heroHeading">Everything your cat needs, <em>nothing they don't.</em></h1>
+      <p id="heroSubheading">Food, treats, litter and grooming picked for cats in Pakistani homes — ordered in a minute, paid for on your doorstep, or in advance if you'd rather.</p>
       <div class="hero-cta">
-        <a href="#shop" class="btn btn--primary">Shop now</a>
+        <a href="#shop" class="btn btn--primary" id="heroCtaBtn">Shop now</a>
         <a href="#" class="btn btn--ghost" style="border-color:rgba(255,255,255,0.5); color:#fff;" id="heroWhatsapp">Order on WhatsApp</a>
       </div>
       <div class="hero-stats">
@@ -68,6 +69,8 @@
     </div>
   </div>
 </section>
+
+<div class="site-banner" id="siteBanner" hidden></div>
 
 <!-- ============ TRUST STRIP ============ -->
 <div class="trust-strip">
@@ -162,6 +165,7 @@
       <ul>
         <li><a href="#" id="footerWhatsapp">WhatsApp us</a></li>
         <li><a href="#" id="trackOrderLink">Track an order</a></li>
+        <li><a href="/blog">Blog</a></li>
         <li><a href="/admin">Store admin</a></li>
       </ul>
     </div>
@@ -176,7 +180,6 @@
   </div>
   <div class="footer-bottom">
     <span>© <span id="year"></span> Pet Max. Made for cats, run from Lahore.</span>
-    <span>Built with Node.js, Express & SQLite</span>
   </div>
 </footer>
 
