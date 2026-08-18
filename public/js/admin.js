@@ -227,7 +227,7 @@ document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
     if (btn.dataset.view === 'analytics') renderAnalytics();
     if (btn.dataset.view === 'coupons') renderCouponsTable();
     if (btn.dataset.view === 'users') renderAdminsTable();
-    if (btn.dataset.view === 'settings') renderSlidesGrid();
+    if (btn.dataset.view === 'settings') { renderSlidesGrid(); loadSettingsForm(); }
   });
 });
 
@@ -481,24 +481,32 @@ function renderCustomersTable() {
 
 // ---------------- Store Settings ----------------
 async function loadSettingsForm() {
-  const res = await fetch('/api/settings');
-  const s = await res.json();
-  document.getElementById('st_whatsapp').value = s.whatsapp_number || '';
-  document.getElementById('st_delivery_fee').value = s.delivery_fee || '';
-  document.getElementById('st_free_delivery_threshold').value = s.free_delivery_threshold || '';
-  document.getElementById('st_currency').value = s.currency_symbol || '';
-  document.getElementById('st_bank_title').value = s.bank_account_title || '';
-  document.getElementById('st_jazzcash').value = s.bank_jazzcash || '';
-  document.getElementById('st_easypaisa').value = s.bank_easypaisa || '';
-  document.getElementById('st_bank_name').value = s.bank_name || '';
-  document.getElementById('st_bank_account').value = s.bank_account || '';
-  document.getElementById('st_iban').value = s.bank_iban || '';
-  document.getElementById('st_hero_heading').value = s.hero_heading || '';
-  document.getElementById('st_hero_subheading').value = s.hero_subheading || '';
-  document.getElementById('st_hero_cta').value = s.hero_cta_text || '';
-  document.getElementById('st_banner_text').value = s.banner_text || '';
-  document.getElementById('st_banner_link').value = s.banner_link || '';
-  document.getElementById('st_google_client_id').value = s.google_client_id || '';
+  const saveBtn = document.getElementById('settingsSaveBtn');
+  saveBtn.disabled = true; // don't allow saving until real values are actually loaded in
+  saveBtn.textContent = 'Loading current settings…';
+  try {
+    const res = await fetch('/api/settings');
+    const s = await res.json();
+    document.getElementById('st_whatsapp').value = s.whatsapp_number || '';
+    document.getElementById('st_delivery_fee').value = s.delivery_fee || '';
+    document.getElementById('st_free_delivery_threshold').value = s.free_delivery_threshold || '';
+    document.getElementById('st_currency').value = s.currency_symbol || '';
+    document.getElementById('st_bank_title').value = s.bank_account_title || '';
+    document.getElementById('st_jazzcash').value = s.bank_jazzcash || '';
+    document.getElementById('st_easypaisa').value = s.bank_easypaisa || '';
+    document.getElementById('st_bank_name').value = s.bank_name || '';
+    document.getElementById('st_bank_account').value = s.bank_account || '';
+    document.getElementById('st_iban').value = s.bank_iban || '';
+    document.getElementById('st_hero_heading').value = s.hero_heading || '';
+    document.getElementById('st_hero_subheading').value = s.hero_subheading || '';
+    document.getElementById('st_hero_cta').value = s.hero_cta_text || '';
+    document.getElementById('st_banner_text').value = s.banner_text || '';
+    document.getElementById('st_banner_link').value = s.banner_link || '';
+    document.getElementById('st_google_client_id').value = s.google_client_id || '';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save settings';
+  }
 }
 
 document.getElementById('settingsForm').addEventListener('submit', async (e) => {
