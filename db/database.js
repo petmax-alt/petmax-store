@@ -287,6 +287,17 @@ async function initSchema() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // General-purpose named image slots for site customization — hero image today,
+    // reusable later for things like the logo or a favicon without a schema change.
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS site_images (
+        image_key VARCHAR(50) PRIMARY KEY,
+        image_data LONGBLOB NOT NULL,
+        image_mime VARCHAR(100) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
   } finally {
     conn.release();
   }

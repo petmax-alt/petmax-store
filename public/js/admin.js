@@ -781,38 +781,120 @@ document.getElementById('bulkCategorySelect').addEventListener('change', async (
 
 // ---------------- Orders table ----------------
 function renderOrdersTable() {
+  const searchTerm = (document.getElementById('orderSearchInput').value || '').toLowerCase();
+  const statusFilter = document.getElementById('orderStatusFilter').value;
+
+  const filtered = ORDERS.filter(o => {
+    const matchesSearch = !searchTerm ||
+      o.order_code.toLowerCase().includes(searchTerm) ||
+      o.customer_name.toLowerCase().includes(searchTerm) ||
+      o.phone.includes(searchTerm);
+    const matchesStatus = !statusFilter || o.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   const tbody = document.getElementById('ordersTableBody');
-  tbody.innerHTML = ORDERS.map(o => `
-    <tr>
+  tbody.innerHTML = filtered.map(o => `
+    <tr class="order-row" data-view-order="${o.id}">
       <td><b>${o.order_code}</b></td>
       <td>${o.customer_name}<br><span style="color:var(--ink-soft); font-size:0.78rem;">${o.phone}</span></td>
       <td style="max-width:220px;">${o.items.map(i => `${i.name} ×${i.qty}`).join(', ')}</td>
       <td>${paymentPill(o)}${o.payment_method === 'online' && o.transaction_id ? `<div style="font-size:0.72rem; color:var(--ink-soft); margin-top:4px;">Ref: ${o.transaction_id}</div>` : ''}</td>
       <td>${fmt(o.total)}</td>
-      <td>
-        <select class="status-select" data-order-status="${o.id}">
-          ${['new', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`).join('')}
-        </select>
-      </td>
+      <td><span class="pill ${{ new: 'pill-orange', processing: 'pill-gray', shipped: 'pill-gray', delivered: 'pill-green', cancelled: 'pill-red' }[o.status] || 'pill-gray'}">${o.status[0].toUpperCase() + o.status.slice(1)}</span></td>
       <td style="font-size:0.78rem; color:var(--ink-soft);">${new Date(o.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}</td>
     </tr>
-  `).join('') || `<tr><td colspan="7" style="text-align:center; color:var(--ink-soft); padding:30px;">No orders yet</td></tr>`;
+  `).join('') || `<tr><td colspan="7" style="text-align:center; color:var(--ink-soft); padding:30px;">No orders match</td></tr>`;
 
-  tbody.querySelectorAll('[data-order-status]').forEach(sel => {
-    sel.addEventListener('change', async () => {
-      const id = Number(sel.dataset.orderStatus);
-      const res = await fetch(`/api/orders/${id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: sel.value }),
-      });
-      if (res.ok) {
-        toast('Order status updated');
-        await loadOrders();
-        renderDashboard();
-      }
-    });
+  tbody.querySelectorAll('[data-view-order]').forEach(row => {
+    row.addEventListener('click', () => openOrderDetail(Number(row.dataset.viewOrder)));
   });
+}
+
+document.getElementById('orderSearchInput').addEventListener('input', renderOrdersTable);
+document.getElementById('orderStatusFilter').addEventListener('change', renderOrdersTable);
+
+function openOrderDetail(id) {
+  const o = ORDERS.find(x => x.id === id);
+  if (!o) return;
+  const body = document.getElementById('orderDetailBody');
+
+  body.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px;">
+      <div>
+        <h2 style="margin-bottom:4px;">${o.order_code}</h2>
+        <p style="color:var(--ink-soft); font-size:0.85rem;">Placed ${new Date(o.created_at).toLocaleString('en-PK', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+      </div>
+      ${paymentPill(o)}
+    </div>
+
+    <div class="od-section">
+      <h3>Customer</h3>
+      <div class="od-row"><span>Name</span><b>${o.customer_name}</b></div>
+      <div class="od-row"><span>Phone</span><b>${o.phone}</b></div>
+      <div class="od-row"><span>Address</span><b style="text-align:right; max-width:60%;">${o.address}, ${o.city}</b></div>
+      ${o.notes ? `<div class="od-row"><span>Notes</span><b style="text-align:right; max-width:60%;">${o.notes}</b></div>` : ''}
+    </div>
+
+    <div class="od-section">
+      <h3>Items</h3>
+      ${o.items.map(i => `
+        <div class="od-item-row">
+          <span>${i.name} <span style="color:var(--ink-soft);">×${i.qty}</span></span>
+          <span>${fmt(i.price * i.qty)}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="od-section">
+      <div class="od-row"><span>Subtotal</span><span>${fmt(o.subtotal)}</span></div>
+      <div class="od-row"><span>Delivery</span><span>${o.delivery_fee === 0 ? 'Free' : fmt(o.delivery_fee)}</span></div>
+      ${o.coupon_code ? `<div class="od-row" style="color:#1DAE55;"><span>Coupon (${o.coupon_code})</span><span>−${fmt(o.discount_amount)}</span></div>` : ''}
+      <div class="od-total-row"><span>Total</span><span>${fmt(o.total)}</span></div>
+    </div>
+
+    <div class="od-section">
+      <h3>Payment</h3>
+      <div class="od-row"><span>Method</span><b>${o.payment_method === 'online' ? 'Online payment' : 'Cash on Delivery'}</b></div>
+      ${o.transaction_id ? `<div class="od-row"><span>Reference</span><b>${o.transaction_id}</b></div>` : ''}
+    </div>
+
+    <div class="od-section" style="margin-bottom:0;">
+      <h3>Update this order</h3>
+      <div class="od-status-controls">
+        <select id="odStatusSelect">
+          ${['new', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`).join('')}
+        </select>
+        <select id="odPaymentStatusSelect">
+          ${['pending', 'awaiting_verification', 'paid', 'failed'].map(s => `<option value="${s}" ${o.payment_status === s ? 'selected' : ''}>${s.replace('_', ' ')}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('odStatusSelect').addEventListener('change', async (e) => {
+    await updateOrderStatus(o.id, { status: e.target.value });
+  });
+  document.getElementById('odPaymentStatusSelect').addEventListener('change', async (e) => {
+    await updateOrderStatus(o.id, { payment_status: e.target.value });
+  });
+
+  document.getElementById('orderDetailModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+async function updateOrderStatus(id, payload) {
+  const res = await fetch(`/api/orders/${id}/status`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  });
+  if (res.ok) {
+    toast('Order updated');
+    await loadOrders();
+    renderOrdersTable();
+    renderDashboard();
+  } else {
+    toast('Could not update order', true);
+  }
 }
 
 // ---------------- Blog ----------------
@@ -1113,6 +1195,37 @@ document.getElementById('addAdminBtn').addEventListener('click', async () => {
   if (!res.ok) return toast(data.error, true);
   toast('Admin user added');
   renderAdminsTable();
+});
+
+// ---------------- Hero image ----------------
+const heroImageDropzone = document.getElementById('heroImageDropzone');
+const heroImageInput = document.getElementById('heroImageInput');
+heroImageDropzone.addEventListener('click', () => heroImageInput.click());
+heroImageInput.addEventListener('change', async () => {
+  const file = heroImageInput.files[0];
+  if (!file) return;
+  const preview = document.getElementById('heroImagePreview');
+  const reader = new FileReader();
+  reader.onload = (e) => { preview.src = e.target.result; };
+  reader.readAsDataURL(file);
+
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch('/api/site-images/hero', { method: 'POST', body: formData });
+  if (res.ok) {
+    toast('Hero image updated');
+    preview.src = `/api/site-images/hero?t=${Date.now()}`; // cache-bust so the new image shows immediately
+  } else {
+    toast('Could not update hero image', true);
+  }
+});
+document.getElementById('heroImageResetBtn').addEventListener('click', async () => {
+  if (!confirm('Reset the hero image back to the default?')) return;
+  const res = await fetch('/api/site-images/hero', { method: 'DELETE' });
+  if (res.ok) {
+    toast('Hero image reset');
+    document.getElementById('heroImagePreview').src = `/api/site-images/hero?t=${Date.now()}`;
+  }
 });
 
 // ---------------- Homepage slides ----------------

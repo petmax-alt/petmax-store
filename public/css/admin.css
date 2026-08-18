@@ -173,6 +173,18 @@ table.admin-table tbody tr:hover { background: var(--cream); }
 .slide-thumb-actions button.danger { background: #FCE4E4; color: #C23B3B; }
 .slide-thumb.inactive { opacity: 0.5; }
 
+/* Order detail modal */
+.od-section { margin-bottom: 20px; }
+.od-section h3 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin-bottom: 8px; }
+.od-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem; }
+.od-item-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--sand-line); font-size: 0.88rem; }
+.od-item-row:last-child { border-bottom: none; }
+.od-total-row { display: flex; justify-content: space-between; padding-top: 10px; font-weight: 700; font-size: 1.05rem; }
+.od-status-controls { display: flex; gap: 10px; margin-top: 6px; }
+.od-status-controls select { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--sand-line); font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; }
+tr.order-row { cursor: pointer; }
+tr.order-row:hover { background: var(--cream); }
+
 .coming-soon { padding: 40px 26px; text-align: center; color: var(--ink-soft); font-size: 0.92rem; line-height: 1.6; max-width: 480px; margin: 0 auto; }
 
 .bulk-action-bar {

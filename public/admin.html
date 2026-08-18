@@ -118,8 +118,19 @@
       <div class="admin-topbar">
         <div>
           <h1>Orders</h1>
-          <p>Update fulfilment and payment status as orders move.</p>
+          <p>Click any order to see full details. Update fulfilment and payment status as orders move.</p>
         </div>
+      </div>
+      <div style="display:flex; gap:10px; margin-bottom:14px;">
+        <input type="text" id="orderSearchInput" placeholder="Search by order code, name, or phone…" style="flex:1; padding:10px 14px; border-radius:10px; border:1px solid var(--sand-line); font-family:var(--font-body);">
+        <select id="orderStatusFilter" style="padding:10px 14px; border-radius:10px; border:1px solid var(--sand-line); font-family:var(--font-body); font-weight:600;">
+          <option value="">All statuses</option>
+          <option value="new">New</option>
+          <option value="processing">Processing</option>
+          <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
       </div>
       <div class="admin-card">
         <table class="admin-table">
@@ -293,6 +304,14 @@
           </div>
           <div class="form-field full" style="border-top:1px solid var(--sand-line); margin-top:6px; padding-top:16px;">
             <label>Homepage content</label>
+          </div>
+          <div class="form-field full">
+            <label>Hero image <span style="font-weight:400; color:var(--ink-soft);">(shown on the right side of the homepage hero)</span></label>
+            <div class="image-dropzone" id="heroImageDropzone" style="max-width:280px;">
+              <img id="heroImagePreview" src="/api/site-images/hero" alt="Current hero image" style="width:100%; border-radius:10px; display:block;">
+              <input type="file" id="heroImageInput" accept="image/*" hidden>
+            </div>
+            <button type="button" class="btn btn--ghost" id="heroImageResetBtn" style="margin-top:8px; font-size:0.8rem;">Reset to default</button>
           </div>
           <div class="form-field full">
             <label for="st_hero_heading">Hero heading</label>
@@ -515,6 +534,14 @@
         <button type="submit" class="btn btn--primary" id="slideSaveBtn">Save slide</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div class="modal" id="orderDetailModal">
+  <div class="modal-backdrop" data-close-modal></div>
+  <div class="modal-panel" style="max-width:560px;">
+    <button class="modal-close" data-close-modal>✕</button>
+    <div id="orderDetailBody" style="padding:30px;"></div>
   </div>
 </div>
 
