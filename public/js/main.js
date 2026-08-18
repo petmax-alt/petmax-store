@@ -15,6 +15,7 @@ const CONFIG = {
   },
   freeDeliveryThreshold: 3000,
   deliveryFee: 200,
+  googleClientId: '', // set via Store Settings — Google Sign-In stays off until this is filled in
 };
 
 let ALL_PRODUCTS = [];
@@ -400,6 +401,42 @@ function updateAccountIcon() {
   btn.title = CURRENT_CUSTOMER ? `${CURRENT_CUSTOMER.name} — My account` : 'Sign in';
 }
 
+function renderGoogleButton() {
+  const wrap = document.getElementById('googleSignInWrap');
+  const divider = document.getElementById('authDivider');
+  if (!wrap) return;
+  if (!CONFIG.googleClientId || !window.google || !window.google.accounts) {
+    wrap.hidden = true;
+    if (divider) divider.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  if (divider) divider.hidden = false;
+  wrap.innerHTML = '';
+  google.accounts.id.initialize({
+    client_id: CONFIG.googleClientId,
+    callback: handleGoogleCredential,
+  });
+  google.accounts.id.renderButton(wrap, { theme: 'outline', size: 'large', width: 360, text: 'continue_with' });
+}
+
+async function handleGoogleCredential(response) {
+  try {
+    const res = await fetch('/api/customers/google', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    CURRENT_CUSTOMER = data;
+    updateAccountIcon();
+    toast(`Welcome, ${data.name.split(' ')[0]}`);
+    renderAccountModal();
+  } catch (err) {
+    toast(err.message || 'Could not sign in with Google', true);
+  }
+}
+
 function renderAccountModal() {
   const body = document.getElementById('accountBody');
   if (CURRENT_CUSTOMER) {
@@ -430,6 +467,8 @@ function renderAccountModal() {
   }
 
   body.innerHTML = `
+    <div id="googleSignInWrap" style="margin-bottom:14px;"></div>
+    <div class="auth-divider" id="authDivider"><span>or</span></div>
     <div class="auth-tabs">
       <button type="button" class="auth-tab active" data-tab="login">Log in</button>
       <button type="button" class="auth-tab" data-tab="signup">Sign up</button>
@@ -449,6 +488,8 @@ function renderAccountModal() {
       <button type="submit" class="btn btn--primary" style="grid-column:1/-1;">Create account</button>
     </form>
   `;
+
+  renderGoogleButton();
 
   body.querySelectorAll('.auth-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -811,6 +852,7 @@ async function loadSiteSettings() {
       banner.hidden = false;
       banner.innerHTML = s.banner_link ? `<a href="${s.banner_link}">${s.banner_text}</a>` : s.banner_text;
     }
+    if (s.google_client_id) CONFIG.googleClientId = s.google_client_id;
   } catch (err) {
     // If this fails, the storefront still works using the hardcoded fallback values above.
     console.warn('Could not load live settings, using defaults', err);

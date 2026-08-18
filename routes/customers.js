@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { pool } = require('../db/database');
+const { OAuth2Client } = require('google-auth-library');
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
@@ -64,6 +65,9 @@ router.post('/login', async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM customers WHERE email = ?', [email.trim().toLowerCase()]);
     const customer = rows[0];
     if (!customer) return res.status(401).json({ error: 'Incorrect email or password' });
+    if (!customer.password_hash) {
+      return res.status(401).json({ error: 'This account signs in with Google. Use the "Sign in with Google" button instead.' });
+    }
 
     const hash = hashPassword(password, customer.password_salt);
     const valid = crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(customer.password_hash, 'hex'));
@@ -74,6 +78,48 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Something went wrong logging you in.' });
+  }
+});
+
+// POST /api/customers/google — verifies the ID token from Google Identity Services,
+// then finds or creates the matching customer account.
+router.post('/google', async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) return res.status(400).json({ error: 'Missing Google credential' });
+  try {
+    const [settingRows] = await pool.query("SELECT setting_value FROM settings WHERE setting_key = 'google_client_id'");
+    const clientId = settingRows[0] && settingRows[0].setting_value;
+    if (!clientId) return res.status(400).json({ error: 'Google Sign-In is not configured on this store yet' });
+
+    const client = new OAuth2Client(clientId);
+    const ticket = await client.verifyIdToken({ idToken: credential, audience: clientId });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) return res.status(400).json({ error: 'Could not verify Google account' });
+
+    const [existingByGoogle] = await pool.query('SELECT * FROM customers WHERE google_id = ?', [payload.sub]);
+    if (existingByGoogle[0]) {
+      req.session.customerId = existingByGoogle[0].id;
+      return res.json({ id: existingByGoogle[0].id, name: existingByGoogle[0].name, email: existingByGoogle[0].email, phone: existingByGoogle[0].phone });
+    }
+
+    // Someone who already has a password account with this email — just link the Google ID
+    // to it instead of creating a duplicate account under the same address.
+    const [existingByEmail] = await pool.query('SELECT * FROM customers WHERE email = ?', [payload.email.toLowerCase()]);
+    if (existingByEmail[0]) {
+      await pool.query('UPDATE customers SET google_id = ? WHERE id = ?', [payload.sub, existingByEmail[0].id]);
+      req.session.customerId = existingByEmail[0].id;
+      return res.json({ id: existingByEmail[0].id, name: existingByEmail[0].name, email: existingByEmail[0].email, phone: existingByEmail[0].phone });
+    }
+
+    const [info] = await pool.query(
+      'INSERT INTO customers (name, email, google_id) VALUES (?, ?, ?)',
+      [payload.name || payload.email.split('@')[0], payload.email.toLowerCase(), payload.sub]
+    );
+    req.session.customerId = info.insertId;
+    res.status(201).json({ id: info.insertId, name: payload.name || payload.email, email: payload.email.toLowerCase(), phone: null });
+  } catch (err) {
+    console.error(err);
+    res.status(401).json({ error: 'Could not verify Google account' });
   }
 });
 

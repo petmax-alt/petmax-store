@@ -498,6 +498,7 @@ async function loadSettingsForm() {
   document.getElementById('st_hero_cta').value = s.hero_cta_text || '';
   document.getElementById('st_banner_text').value = s.banner_text || '';
   document.getElementById('st_banner_link').value = s.banner_link || '';
+  document.getElementById('st_google_client_id').value = s.google_client_id || '';
 }
 
 document.getElementById('settingsForm').addEventListener('submit', async (e) => {
@@ -525,6 +526,7 @@ document.getElementById('settingsForm').addEventListener('submit', async (e) => 
         hero_cta_text: document.getElementById('st_hero_cta').value.trim(),
         banner_text: document.getElementById('st_banner_text').value.trim(),
         banner_link: document.getElementById('st_banner_link').value.trim(),
+        google_client_id: document.getElementById('st_google_client_id').value.trim(),
       }),
     });
     if (!res.ok) throw new Error('Could not save settings');

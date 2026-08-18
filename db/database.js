@@ -107,11 +107,30 @@ async function initSchema() {
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL UNIQUE,
         phone VARCHAR(50),
-        password_hash VARCHAR(255) NOT NULL,
-        password_salt VARCHAR(64) NOT NULL,
+        password_hash VARCHAR(255) NULL,
+        password_salt VARCHAR(64) NULL,
+        google_id VARCHAR(255) NULL UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migration: existing installs had password_hash/salt as NOT NULL and no google_id —
+    // widen them so Google-only accounts (no password at all) can be stored.
+    const [pwCol] = await conn.query(`
+      SELECT IS_NULLABLE FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'password_hash'
+    `);
+    if (pwCol[0] && pwCol[0].IS_NULLABLE === 'NO') {
+      await conn.query('ALTER TABLE customers MODIFY COLUMN password_hash VARCHAR(255) NULL');
+      await conn.query('ALTER TABLE customers MODIFY COLUMN password_salt VARCHAR(64) NULL');
+    }
+    const [googleIdCol] = await conn.query(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'customers' AND COLUMN_NAME = 'google_id'
+    `);
+    if (googleIdCol.length === 0) {
+      await conn.query('ALTER TABLE customers ADD COLUMN google_id VARCHAR(255) NULL UNIQUE');
+    }
 
     // Migration: link orders to a registered customer when one placed them (still nullable — guest checkout stays supported)
     const [customerIdCol] = await conn.query(`
@@ -190,6 +209,7 @@ async function initSchema() {
       bank_name: '',
       bank_account: '',
       bank_iban: '',
+      google_client_id: '', // Google Sign-In is off until the admin adds a real Client ID here
     };
     for (const [key, value] of Object.entries(defaults)) {
       await conn.query('INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
