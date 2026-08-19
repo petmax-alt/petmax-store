@@ -50,6 +50,7 @@
     <button class="admin-nav-item" data-view="coupons">🎟️ Coupons</button>
     <button class="admin-nav-item" data-view="analytics">📈 Analytics</button>
     <button class="admin-nav-item" data-view="blog">📝 Blog</button>
+    <button class="admin-nav-item" data-view="seo">🔍 SEO</button>
     <button class="admin-nav-item" data-view="settings">⚙️ Store Settings</button>
     <button class="admin-nav-item" data-view="users">🔑 Users/Admins</button>
     <div class="admin-nav-spacer"></div>
@@ -246,6 +247,88 @@
           <thead><tr><th></th><th>Title</th><th>Status</th><th>Published</th><th></th></tr></thead>
           <tbody id="blogTableBody"></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- SEO view -->
+    <section id="view-seo" hidden>
+      <div class="admin-topbar">
+        <div><h1>SEO</h1><p>Sitewide search visibility settings, tracking, and redirects.</p></div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-head"><h2>General</h2></div>
+        <form id="seoForm" class="admin-form-grid" style="padding:24px 26px;">
+          <div class="form-field full">
+            <label for="seo_site_name">Site name</label>
+            <input type="text" id="seo_site_name" placeholder="Pet Max">
+          </div>
+          <div class="form-field full">
+            <label for="seo_site_url">Site URL</label>
+            <input type="text" id="seo_site_url" placeholder="https://petmax.pk">
+          </div>
+          <div class="form-field full">
+            <label for="seo_default_meta_description">Default meta description <span style="font-weight:400; color:var(--ink-soft);">(used when a product/post doesn't have its own)</span></label>
+            <textarea id="seo_default_meta_description" rows="2" maxlength="300"></textarea>
+          </div>
+          <div class="form-field full" style="border-top:1px solid var(--sand-line); margin-top:6px; padding-top:16px;">
+            <label>Tracking &amp; verification</label>
+          </div>
+          <div class="form-field">
+            <label for="seo_ga_id">Google Analytics ID</label>
+            <input type="text" id="seo_ga_id" placeholder="G-XXXXXXXXXX">
+          </div>
+          <div class="form-field">
+            <label for="seo_gsc_verification">Search Console verification code</label>
+            <input type="text" id="seo_gsc_verification" placeholder="from the HTML tag method">
+          </div>
+          <div class="form-field full" style="border-top:1px solid var(--sand-line); margin-top:6px; padding-top:16px;">
+            <label>Advanced</label>
+          </div>
+          <div class="form-field full">
+            <label for="seo_head_scripts">Custom scripts — before &lt;/head&gt; <span style="font-weight:400; color:var(--ink-soft);">(e.g. Facebook Pixel)</span></label>
+            <textarea id="seo_head_scripts" rows="3" style="font-family:monospace; font-size:0.82rem;"></textarea>
+          </div>
+          <div class="form-field full">
+            <label for="seo_footer_scripts">Custom scripts — before &lt;/body&gt;</label>
+            <textarea id="seo_footer_scripts" rows="3" style="font-family:monospace; font-size:0.82rem;"></textarea>
+          </div>
+          <div class="form-field full">
+            <label for="seo_robots_txt">robots.txt content</label>
+            <textarea id="seo_robots_txt" rows="6" style="font-family:monospace; font-size:0.82rem;"></textarea>
+          </div>
+          <div class="admin-form-actions">
+            <button type="submit" class="btn btn--primary" id="seoSaveBtn" disabled>Loading current settings…</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-head">
+          <h2>Redirects</h2>
+          <p style="font-size:0.8rem; color:var(--ink-soft); margin:0;">Send an old URL to a new one — useful when you rename or remove a page.</p>
+        </div>
+        <table class="admin-table">
+          <thead><tr><th>From</th><th>To</th><th>Type</th><th></th></tr></thead>
+          <tbody id="redirectsTableBody"></tbody>
+        </table>
+        <form id="addRedirectForm" style="display:flex; gap:8px; padding:16px 22px; flex-wrap:wrap;">
+          <input type="text" id="rd_from" placeholder="/old-path" required style="flex:1; min-width:140px; padding:9px 12px; border-radius:8px; border:1px solid var(--sand-line);">
+          <input type="text" id="rd_to" placeholder="/new-path" required style="flex:1; min-width:140px; padding:9px 12px; border-radius:8px; border:1px solid var(--sand-line);">
+          <select id="rd_type" style="padding:9px 12px; border-radius:8px; border:1px solid var(--sand-line); font-weight:600;">
+            <option value="301">301 (permanent)</option>
+            <option value="302">302 (temporary)</option>
+          </select>
+          <button type="submit" class="btn btn--primary">Add redirect</button>
+        </form>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-head"><h2>Useful links</h2></div>
+        <div style="padding:16px 22px; display:flex; gap:16px; flex-wrap:wrap; font-size:0.88rem;">
+          <a href="/sitemap.xml" target="_blank">View sitemap.xml →</a>
+          <a href="/robots.txt" target="_blank">View robots.txt →</a>
+        </div>
       </div>
     </section>
 
@@ -452,6 +535,46 @@
         <div id="pf_description_editor"></div>
         <input type="hidden" id="pf_description">
       </div>
+
+      <div class="form-field full" style="border-top:1px solid var(--sand-line); margin-top:6px; padding-top:16px;">
+        <label>SEO &amp; discoverability</label>
+      </div>
+      <div class="form-field full">
+        <label for="pf_seo_title">SEO title <span style="font-weight:400; color:var(--ink-soft);">(shown in Google results — leave empty to use the product name)</span></label>
+        <input type="text" id="pf_seo_title" maxlength="70">
+      </div>
+      <div class="form-field full">
+        <label for="pf_meta_description">Meta description <span style="font-weight:400; color:var(--ink-soft);">(~150 characters, shown under the title in Google)</span></label>
+        <textarea id="pf_meta_description" rows="2" maxlength="300"></textarea>
+      </div>
+      <div class="form-field">
+        <label for="pf_focus_keyword">Focus keyword</label>
+        <input type="text" id="pf_focus_keyword" placeholder="e.g. cat dry food Lahore">
+      </div>
+      <div class="form-field">
+        <label for="pf_meta_robots">Search visibility</label>
+        <select id="pf_meta_robots">
+          <option value="index,follow">Index — show in search results</option>
+          <option value="noindex,follow">Noindex — hide from search results</option>
+        </select>
+      </div>
+      <div class="form-field full">
+        <label for="pf_canonical_url">Canonical URL <span style="font-weight:400; color:var(--ink-soft);">(only needed if this exact product is also listed elsewhere)</span></label>
+        <input type="text" id="pf_canonical_url" placeholder="https://petmax.pk/product/...">
+      </div>
+      <div class="form-field">
+        <label for="pf_gtin">GTIN / barcode</label>
+        <input type="text" id="pf_gtin">
+      </div>
+      <div class="form-field">
+        <label for="pf_mpn">MPN</label>
+        <input type="text" id="pf_mpn">
+      </div>
+      <div class="form-field full">
+        <label for="pf_brand">Brand</label>
+        <input type="text" id="pf_brand" placeholder="Pet Max">
+      </div>
+
       <p class="field-error" id="productFormError" style="display:none;"></p>
       <div class="admin-form-actions">
         <button type="button" class="btn btn--ghost" data-close-modal>Cancel</button>
@@ -498,6 +621,26 @@
           <option value="published">Published</option>
         </select>
       </div>
+
+      <div class="form-field full" style="border-top:1px solid var(--sand-line); margin-top:6px; padding-top:16px;">
+        <label>SEO</label>
+      </div>
+      <div class="form-field full">
+        <label for="bf_seo_title">SEO title <span style="font-weight:400; color:var(--ink-soft);">(leave empty to use the post title)</span></label>
+        <input type="text" id="bf_seo_title" maxlength="70">
+      </div>
+      <div class="form-field full">
+        <label for="bf_meta_description">Meta description <span style="font-weight:400; color:var(--ink-soft);">(leave empty to use the excerpt)</span></label>
+        <textarea id="bf_meta_description" rows="2" maxlength="300"></textarea>
+      </div>
+      <div class="form-field full">
+        <label for="bf_meta_robots">Search visibility</label>
+        <select id="bf_meta_robots">
+          <option value="index,follow">Index — show in search results</option>
+          <option value="noindex,follow">Noindex — hide from search results</option>
+        </select>
+      </div>
+
       <p class="field-error" id="blogFormError" style="display:none; grid-column:1/-1;"></p>
       <div class="admin-form-actions">
         <button type="button" class="btn btn--ghost" data-close-modal>Cancel</button>

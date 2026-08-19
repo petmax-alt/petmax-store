@@ -211,7 +211,7 @@ function showAdmin() {
 }
 
 // ---------------- Nav ----------------
-const ALL_VIEWS = ['dashboard', 'orders', 'products', 'categories', 'inventory', 'customers', 'coupons', 'analytics', 'blog', 'settings', 'users'];
+const ALL_VIEWS = ['dashboard', 'orders', 'products', 'categories', 'inventory', 'customers', 'coupons', 'analytics', 'blog', 'seo', 'settings', 'users'];
 
 document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -228,6 +228,7 @@ document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
     if (btn.dataset.view === 'coupons') renderCouponsTable();
     if (btn.dataset.view === 'users') renderAdminsTable();
     if (btn.dataset.view === 'settings') { renderSlidesGrid(); loadSettingsForm(); }
+    if (btn.dataset.view === 'seo') { loadSeoForm(); renderRedirectsTable(); }
   });
 });
 
@@ -631,6 +632,14 @@ async function openProductForm(id) {
     document.getElementById('pf_badge').value = p.badge || '';
     document.getElementById('pf_accent').value = p.accent;
     document.getElementById('pf_sku').value = p.sku || '';
+    document.getElementById('pf_seo_title').value = p.seo_title || '';
+    document.getElementById('pf_meta_description').value = p.meta_description || '';
+    document.getElementById('pf_focus_keyword').value = p.focus_keyword || '';
+    document.getElementById('pf_meta_robots').value = p.meta_robots || 'index,follow';
+    document.getElementById('pf_canonical_url').value = p.canonical_url || '';
+    document.getElementById('pf_gtin').value = p.gtin || '';
+    document.getElementById('pf_mpn').value = p.mpn || '';
+    document.getElementById('pf_brand').value = p.brand || '';
     if (p.description) descriptionEditor.root.innerHTML = p.description;
     document.getElementById('pf_description').value = p.description || '';
 
@@ -668,6 +677,14 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   formData.append('accent', document.getElementById('pf_accent').value);
   formData.append('sku', document.getElementById('pf_sku').value.trim());
   formData.append('description', document.getElementById('pf_description').value.trim());
+  formData.append('seo_title', document.getElementById('pf_seo_title').value.trim());
+  formData.append('meta_description', document.getElementById('pf_meta_description').value.trim());
+  formData.append('focus_keyword', document.getElementById('pf_focus_keyword').value.trim());
+  formData.append('meta_robots', document.getElementById('pf_meta_robots').value);
+  formData.append('canonical_url', document.getElementById('pf_canonical_url').value.trim());
+  formData.append('gtin', document.getElementById('pf_gtin').value.trim());
+  formData.append('mpn', document.getElementById('pf_mpn').value.trim());
+  formData.append('brand', document.getElementById('pf_brand').value.trim());
   NEW_IMAGE_FILES.forEach(file => formData.append('images', file));
   if (REMOVE_IMAGE_IDS.length) formData.append('remove_image_ids', JSON.stringify(REMOVE_IMAGE_IDS));
 
@@ -974,6 +991,9 @@ function openBlogForm(id) {
     document.getElementById('bf_title').value = p.title;
     document.getElementById('bf_excerpt').value = p.excerpt || '';
     document.getElementById('bf_status').value = p.status;
+    document.getElementById('bf_seo_title').value = p.seo_title || '';
+    document.getElementById('bf_meta_description').value = p.meta_description || '';
+    document.getElementById('bf_meta_robots').value = p.meta_robots || 'index,follow';
     if (p.content) blogContentEditor.root.innerHTML = p.content;
     document.getElementById('bf_content').value = p.content || '';
     if (p.has_cover_image) {
@@ -1028,6 +1048,9 @@ document.getElementById('blogForm').addEventListener('submit', async (e) => {
   formData.append('excerpt', document.getElementById('bf_excerpt').value.trim());
   formData.append('content', document.getElementById('bf_content').value);
   formData.append('status', document.getElementById('bf_status').value);
+  formData.append('seo_title', document.getElementById('bf_seo_title').value.trim());
+  formData.append('meta_description', document.getElementById('bf_meta_description').value.trim());
+  formData.append('meta_robots', document.getElementById('bf_meta_robots').value);
   if (BLOG_COVER_FILE) formData.append('cover_image', BLOG_COVER_FILE);
 
   const saveBtn = document.getElementById('blogSaveBtn');
@@ -1367,6 +1390,93 @@ document.getElementById('slideForm').addEventListener('submit', async (e) => {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save slide';
   }
+});
+
+// ---------------- SEO Settings ----------------
+async function loadSeoForm() {
+  const saveBtn = document.getElementById('seoSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Loading current settings…';
+  try {
+    const res = await fetch('/api/settings');
+    const s = await res.json();
+    document.getElementById('seo_site_name').value = s.site_name || '';
+    document.getElementById('seo_site_url').value = s.site_url || '';
+    document.getElementById('seo_default_meta_description').value = s.default_meta_description || '';
+    document.getElementById('seo_ga_id').value = s.google_analytics_id || '';
+    document.getElementById('seo_gsc_verification').value = s.google_site_verification || '';
+    document.getElementById('seo_head_scripts').value = s.custom_head_scripts || '';
+    document.getElementById('seo_footer_scripts').value = s.custom_footer_scripts || '';
+    document.getElementById('seo_robots_txt').value = s.robots_txt || '';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save SEO settings';
+  }
+}
+
+document.getElementById('seoForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('seoSaveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        site_name: document.getElementById('seo_site_name').value.trim(),
+        site_url: document.getElementById('seo_site_url').value.trim(),
+        default_meta_description: document.getElementById('seo_default_meta_description').value.trim(),
+        google_analytics_id: document.getElementById('seo_ga_id').value.trim(),
+        google_site_verification: document.getElementById('seo_gsc_verification').value.trim(),
+        custom_head_scripts: document.getElementById('seo_head_scripts').value,
+        custom_footer_scripts: document.getElementById('seo_footer_scripts').value,
+        robots_txt: document.getElementById('seo_robots_txt').value,
+      }),
+    });
+    if (!res.ok) throw new Error('Could not save SEO settings');
+    toast('SEO settings saved');
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save SEO settings';
+  }
+});
+
+// ---------------- Redirect manager ----------------
+async function renderRedirectsTable() {
+  const res = await fetch('/api/redirects');
+  const redirects = await res.json();
+  document.getElementById('redirectsTableBody').innerHTML = redirects.map(r => `
+    <tr>
+      <td><code>${r.from_path}</code></td>
+      <td><code>${r.to_path}</code></td>
+      <td><span class="pill pill-gray">${r.status_code}</span></td>
+      <td><button class="danger" data-delete-redirect="${r.id}">Delete</button></td>
+    </tr>
+  `).join('') || `<tr><td colspan="4" style="text-align:center; color:var(--ink-soft); padding:30px;">No redirects set up</td></tr>`;
+
+  document.querySelectorAll('[data-delete-redirect]').forEach(btn => btn.addEventListener('click', async () => {
+    await fetch(`/api/redirects/${btn.dataset.deleteRedirect}`, { method: 'DELETE' });
+    renderRedirectsTable();
+  }));
+}
+
+document.getElementById('addRedirectForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const res = await fetch('/api/redirects', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from_path: document.getElementById('rd_from').value.trim(),
+      to_path: document.getElementById('rd_to').value.trim(),
+      status_code: Number(document.getElementById('rd_type').value),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error, true);
+  toast('Redirect added');
+  document.getElementById('addRedirectForm').reset();
+  renderRedirectsTable();
 });
 
 checkAuth();

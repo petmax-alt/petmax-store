@@ -125,7 +125,7 @@ function productCardHTML(p) {
     </div>
     <div class="product-body">
       <span class="product-category">${p.category}</span>
-      <h3 class="product-name" data-quickview="${p.id}" style="cursor:pointer;">${p.name}</h3>
+      <a href="/product/${p.slug}"><h3 class="product-name">${p.name}</h3></a>
       <div class="product-rating"><span class="stars">${'★'.repeat(Math.round(p.rating))}${'☆'.repeat(5 - Math.round(p.rating))}</span> (${p.reviews})</div>
       <div class="product-price-row">
         ${p.has_variants
@@ -817,15 +817,17 @@ document.querySelectorAll('[data-cat-link]').forEach(el => {
 });
 
 // ---------------- WhatsApp buttons (generic) ----------------
-const genericWaText = `Hi Pet Max! I'd like to ask about your products for my cat.`;
-['heroWhatsapp', 'footerWhatsapp', 'floatWhatsapp'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) {
-    el.href = waLink(CONFIG.whatsappNumber, genericWaText);
-    el.target = '_blank';
-    el.rel = 'noopener';
-  }
-});
+function wireGenericWhatsappButtons() {
+  const genericWaText = `Hi Pet Max! I'd like to ask about your products for my cat.`;
+  ['heroWhatsapp', 'footerWhatsapp', 'floatWhatsapp'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.href = waLink(CONFIG.whatsappNumber, genericWaText);
+      el.target = '_blank';
+      el.rel = 'noopener';
+    }
+  });
+}
 
 // ---------------- Init ----------------
 document.getElementById('year').textContent = new Date().getFullYear();
@@ -923,6 +925,7 @@ function initScrollAnimations() {
 
 (async function init() {
   await loadSiteSettings();
+  wireGenericWhatsappButtons();
   await loadCurrentCustomer();
   await loadCategories();
   await loadProducts();

@@ -490,6 +490,7 @@ h1, h2, h3, h4 {
 }
 .product-category { font-size: 0.72rem; font-weight: 700; color: var(--orange); text-transform: uppercase; letter-spacing: 0.06em; }
 .product-name { font-family: var(--font-display); font-size: 1.02rem; font-weight: 600; line-height: 1.3; }
+.product-body > a { display: block; color: inherit; text-decoration: none; }
 .product-rating { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: var(--ink-soft); }
 .product-rating .stars { color: var(--gold); letter-spacing: 1px; }
 
@@ -973,4 +974,26 @@ h1, h2, h3, h4 {
 [data-animate="fade"] { transform: none; }
 @media (prefers-reduced-motion: reduce) {
   [data-animate] { opacity: 1; transform: none; transition: none; }
+}
+
+/* ============ Product page (server-rendered) ============ */
+.pp-breadcrumb { padding: 16px 24px; font-size: 0.82rem; color: var(--ink-soft); }
+.pp-breadcrumb a { color: var(--ink-soft); }
+.pp-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 46px; padding: 10px 24px 60px; max-width: 1100px; margin: 0 auto; }
+.pp-main-image { aspect-ratio: 1/1; border-radius: var(--radius-md); background: var(--sand); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.pp-main-image.accent-navy { background: #E4EAF3; }
+.pp-thumb-img { width: 100%; height: 100%; object-fit: cover; }
+.pp-no-image { font-size: 3rem; }
+.pp-thumbs { display: flex; gap: 8px; margin-top: 10px; }
+.pp-thumb { width: 60px; height: 60px; border-radius: 8px; overflow: hidden; border: 2px solid transparent; padding: 0; opacity: 0.6; }
+.pp-thumb.active { opacity: 1; border-color: var(--orange); }
+.pp-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pp-info h1 { font-family: var(--font-display); font-size: 1.8rem; margin: 8px 0 10px; }
+.pp-price-row { display: flex; align-items: baseline; gap: 10px; margin: 16px 0 4px; }
+.pp-price-row .price { font-size: 1.7rem; font-weight: 800; color: var(--ink); }
+.pp-description { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--sand-line); line-height: 1.7; }
+.pp-description p { margin-bottom: 12px; }
+
+@media (max-width: 800px) {
+  .pp-wrap { grid-template-columns: 1fr; gap: 24px; }
 }

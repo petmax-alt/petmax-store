@@ -156,7 +156,10 @@ router.get('/:slug', async (req, res) => {
 
 // POST /api/products  (admin only) — multipart/form-data, up to 6 "images" files
 router.post('/', requireAdmin, upload.array('images', 6), async (req, res) => {
-  const { name, category, price, compare_price, stock, description, icon, accent, badge, sku } = req.body;
+  const {
+    name, category, price, compare_price, stock, description, icon, accent, badge, sku,
+    seo_title, meta_description, focus_keyword, canonical_url, meta_robots, og_title, og_description, gtin, mpn, brand,
+  } = req.body;
   if (!name || !category || !price) {
     return res.status(400).json({ error: 'name, category and price are required' });
   }
@@ -165,9 +168,16 @@ router.post('/', requireAdmin, upload.array('images', 6), async (req, res) => {
   try {
     await conn.beginTransaction();
     const [info] = await conn.query(`
-      INSERT INTO products (name, slug, category, price, compare_price, stock, description, icon, accent, badge, sku)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [name, slug, category, price, compare_price || null, stock || 0, description || '', icon || 'food', accent || 'orange', badge || null, sku || null]);
+      INSERT INTO products (
+        name, slug, category, price, compare_price, stock, description, icon, accent, badge, sku,
+        seo_title, meta_description, focus_keyword, canonical_url, meta_robots, og_title, og_description, gtin, mpn, brand
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      name, slug, category, price, compare_price || null, stock || 0, description || '', icon || 'food', accent || 'orange', badge || null, sku || null,
+      seo_title || null, meta_description || null, focus_keyword || null, canonical_url || null, meta_robots || 'index,follow',
+      og_title || null, og_description || null, gtin || null, mpn || null, brand || 'Pet Max',
+    ]);
 
     const files = req.files || [];
     for (let i = 0; i < files.length; i++) {
@@ -199,7 +209,10 @@ router.put('/:id', requireAdmin, upload.array('images', 6), async (req, res) => 
     const existing = existingRows[0];
     if (!existing) return res.status(404).json({ error: 'Product not found' });
 
-    const { name, category, price, compare_price, stock, description, icon, accent, badge, sku, remove_image_ids } = req.body;
+    const {
+      name, category, price, compare_price, stock, description, icon, accent, badge, sku, remove_image_ids,
+      seo_title, meta_description, focus_keyword, canonical_url, meta_robots, og_title, og_description, gtin, mpn, brand,
+    } = req.body;
     const updated = {
       name: name ?? existing.name,
       category: category ?? existing.category,
@@ -211,13 +224,29 @@ router.put('/:id', requireAdmin, upload.array('images', 6), async (req, res) => 
       accent: accent ?? existing.accent,
       badge: badge === '' ? null : (badge ?? existing.badge),
       sku: sku === '' ? null : (sku ?? existing.sku),
+      seo_title: seo_title === '' ? null : (seo_title ?? existing.seo_title),
+      meta_description: meta_description === '' ? null : (meta_description ?? existing.meta_description),
+      focus_keyword: focus_keyword === '' ? null : (focus_keyword ?? existing.focus_keyword),
+      canonical_url: canonical_url === '' ? null : (canonical_url ?? existing.canonical_url),
+      meta_robots: meta_robots ?? existing.meta_robots,
+      og_title: og_title === '' ? null : (og_title ?? existing.og_title),
+      og_description: og_description === '' ? null : (og_description ?? existing.og_description),
+      gtin: gtin === '' ? null : (gtin ?? existing.gtin),
+      mpn: mpn === '' ? null : (mpn ?? existing.mpn),
+      brand: brand === '' ? 'Pet Max' : (brand ?? existing.brand),
     };
     const slug = name ? slugify(name) : existing.slug;
 
     await pool.query(`
-      UPDATE products SET name=?, slug=?, category=?, price=?, compare_price=?, stock=?, description=?, icon=?, accent=?, badge=?, sku=?
+      UPDATE products SET
+        name=?, slug=?, category=?, price=?, compare_price=?, stock=?, description=?, icon=?, accent=?, badge=?, sku=?,
+        seo_title=?, meta_description=?, focus_keyword=?, canonical_url=?, meta_robots=?, og_title=?, og_description=?, gtin=?, mpn=?, brand=?
       WHERE id=?
-    `, [updated.name, slug, updated.category, updated.price, updated.compare_price, updated.stock, updated.description, updated.icon, updated.accent, updated.badge, updated.sku, req.params.id]);
+    `, [
+      updated.name, slug, updated.category, updated.price, updated.compare_price, updated.stock, updated.description, updated.icon, updated.accent, updated.badge, updated.sku,
+      updated.seo_title, updated.meta_description, updated.focus_keyword, updated.canonical_url, updated.meta_robots, updated.og_title, updated.og_description, updated.gtin, updated.mpn, updated.brand,
+      req.params.id,
+    ]);
 
     if (remove_image_ids) {
       const ids = JSON.parse(remove_image_ids);

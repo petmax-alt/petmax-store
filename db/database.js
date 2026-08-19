@@ -318,6 +318,70 @@ async function initSchema() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+
+    // ---- SEO fields ----
+    async function addColumnIfMissing(table, column, definition) {
+      const [rows] = await conn.query(`
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+      `, [table, column]);
+      if (rows.length === 0) {
+        await conn.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      }
+    }
+
+    for (const [col, def] of [
+      ['seo_title', 'VARCHAR(255)'],
+      ['meta_description', 'VARCHAR(300)'],
+      ['focus_keyword', 'VARCHAR(150)'],
+      ['canonical_url', 'VARCHAR(500)'],
+      ['meta_robots', "VARCHAR(30) NOT NULL DEFAULT 'index,follow'"],
+      ['og_title', 'VARCHAR(255)'],
+      ['og_description', 'VARCHAR(300)'],
+      ['gtin', 'VARCHAR(50)'],
+      ['mpn', 'VARCHAR(50)'],
+      ['brand', "VARCHAR(150) NOT NULL DEFAULT 'Pet Max'"],
+    ]) {
+      await addColumnIfMissing('products', col, def);
+    }
+    for (const [col, def] of [
+      ['seo_title', 'VARCHAR(255)'],
+      ['meta_description', 'VARCHAR(300)'],
+      ['meta_robots', "VARCHAR(30) NOT NULL DEFAULT 'index,follow'"],
+    ]) {
+      await addColumnIfMissing('blog_posts', col, def);
+    }
+    for (const [col, def] of [
+      ['seo_title', 'VARCHAR(255)'],
+      ['meta_description', 'VARCHAR(300)'],
+    ]) {
+      await addColumnIfMissing('categories', col, def);
+    }
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS redirects (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        from_path VARCHAR(500) NOT NULL UNIQUE,
+        to_path VARCHAR(500) NOT NULL,
+        status_code INT NOT NULL DEFAULT 301,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const seoDefaults = {
+      site_name: 'Pet Max',
+      default_meta_description: "Cat food, treats, litter, grooming and toys — ordered online, delivered across Pakistan with Cash on Delivery.",
+      site_url: 'https://petmax.pk',
+      robots_txt: 'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api\n\nSitemap: https://petmax.pk/sitemap.xml',
+      google_analytics_id: '',
+      google_site_verification: '',
+      custom_head_scripts: '',
+      custom_footer_scripts: '',
+      organization_logo_url: '',
+    };
+    for (const [key, value] of Object.entries(seoDefaults)) {
+      await conn.query('INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
+    }
   } finally {
     conn.release();
   }

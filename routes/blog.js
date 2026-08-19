@@ -74,16 +74,17 @@ router.get('/:slug', async (req, res) => {
 
 // POST /api/blog (admin only)
 router.post('/', requireAdmin, upload.single('cover_image'), async (req, res) => {
-  const { title, excerpt, content, status } = req.body;
+  const { title, excerpt, content, status, seo_title, meta_description, meta_robots } = req.body;
   if (!title) return res.status(400).json({ error: 'Title is required' });
   try {
     const slug = slugify(title);
     const publishedAt = status === 'published' ? new Date() : null;
     const [info] = await pool.query(`
-      INSERT INTO blog_posts (title, slug, excerpt, content, status, published_at, cover_image_data, cover_image_mime)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO blog_posts (title, slug, excerpt, content, status, published_at, cover_image_data, cover_image_mime, seo_title, meta_description, meta_robots)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [title, slug, excerpt || '', content || '', status || 'draft', publishedAt,
-        req.file ? req.file.buffer : null, req.file ? req.file.mimetype : null]);
+        req.file ? req.file.buffer : null, req.file ? req.file.mimetype : null,
+        seo_title || null, meta_description || null, meta_robots || 'index,follow']);
     const [created] = await pool.query('SELECT * FROM blog_posts WHERE id = ?', [info.insertId]);
     res.status(201).json(stripCoverBlob(created[0]));
   } catch (err) {
@@ -100,7 +101,7 @@ router.put('/:id', requireAdmin, upload.single('cover_image'), async (req, res) 
     const existing = existingRows[0];
     if (!existing) return res.status(404).json({ error: 'Post not found' });
 
-    const { title, excerpt, content, status } = req.body;
+    const { title, excerpt, content, status, seo_title, meta_description, meta_robots } = req.body;
     const newStatus = status ?? existing.status;
     // Only stamp published_at the first time a post goes live — don't reset it on every later edit.
     let publishedAt = existing.published_at;
@@ -111,9 +112,16 @@ router.put('/:id', requireAdmin, upload.single('cover_image'), async (req, res) 
     const cover_image_mime = req.file ? req.file.mimetype : existing.cover_image_mime;
 
     await pool.query(`
-      UPDATE blog_posts SET title=?, slug=?, excerpt=?, content=?, status=?, published_at=?, cover_image_data=?, cover_image_mime=?
+      UPDATE blog_posts SET title=?, slug=?, excerpt=?, content=?, status=?, published_at=?, cover_image_data=?, cover_image_mime=?,
+        seo_title=?, meta_description=?, meta_robots=?
       WHERE id=?
-    `, [title ?? existing.title, slug, excerpt ?? existing.excerpt, content ?? existing.content, newStatus, publishedAt, cover_image_data, cover_image_mime, req.params.id]);
+    `, [
+      title ?? existing.title, slug, excerpt ?? existing.excerpt, content ?? existing.content, newStatus, publishedAt, cover_image_data, cover_image_mime,
+      seo_title === '' ? null : (seo_title ?? existing.seo_title),
+      meta_description === '' ? null : (meta_description ?? existing.meta_description),
+      meta_robots ?? existing.meta_robots,
+      req.params.id,
+    ]);
 
     const [updated] = await pool.query('SELECT * FROM blog_posts WHERE id = ?', [req.params.id]);
     res.json(stripCoverBlob(updated[0]));
