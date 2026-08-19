@@ -262,6 +262,10 @@ function populateCategoryDropdown() {
   const select = document.getElementById('pf_category');
   if (!select) return;
   const current = select.value;
+  if (CATEGORIES.length === 0) {
+    select.innerHTML = `<option value="" disabled selected>No categories yet — add one under Categories first</option>`;
+    return;
+  }
   select.innerHTML = CATEGORIES.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
   if (current) select.value = current;
 }
@@ -615,6 +619,11 @@ async function openProductForm(id) {
   VARIANTS = [];
   renderGallery();
   renderVariants();
+
+  // Always pull categories fresh here — don't rely on the one-time load at login,
+  // since that can leave this dropdown empty or stale in a long-running session.
+  await loadCategories();
+  populateCategoryDropdown();
 
   if (id) {
     document.getElementById('productModalTitle').textContent = 'Edit product';
