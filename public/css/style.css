@@ -997,3 +997,14 @@ h1, h2, h3, h4 {
 @media (max-width: 800px) {
   .pp-wrap { grid-template-columns: 1fr; gap: 24px; }
 }
+
+/* Product page reviews */
+.pp-reviews { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--sand-line); }
+.pp-reviews h2 { font-size: 1.1rem; margin-bottom: 16px; }
+.pp-review { padding: 14px 0; border-bottom: 1px solid var(--sand-line); }
+.pp-review:last-child { border-bottom: none; }
+.pp-review-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.pp-review-head .stars { color: var(--orange); font-size: 0.9rem; }
+.pp-review-source { font-size: 0.72rem; color: var(--ink-soft); background: var(--sand); padding: 2px 8px; border-radius: var(--radius-pill); }
+.pp-review p { font-size: 0.9rem; color: var(--ink); margin-bottom: 6px; }
+.pp-review-date { font-size: 0.76rem; color: var(--ink-soft); }

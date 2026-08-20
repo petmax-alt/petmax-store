@@ -27,6 +27,11 @@ router.get('/product/:slug', async (req, res, next) => {
 
     const [images] = await pool.query('SELECT id FROM product_images WHERE product_id = ? ORDER BY sort_order ASC, id ASC', [p.id]);
     const [variants] = await pool.query('SELECT * FROM product_variants WHERE product_id = ? ORDER BY sort_order ASC, id ASC', [p.id]);
+    const [reviews] = await pool.query('SELECT * FROM product_reviews WHERE product_id = ? ORDER BY review_date DESC', [p.id]);
+    const reviewCount = reviews.length;
+    const avgRating = reviewCount > 0 ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviewCount) * 10) / 10 : 0;
+    p.rating = avgRating; // overwrite the old static seed value with real data everywhere below
+    p.reviews = reviewCount;
     const settings = await getSettings();
 
     const siteUrl = (settings.site_url || 'https://petmax.pk').replace(/\/$/, '');
@@ -59,6 +64,13 @@ router.get('/product/:slug', async (req, res, next) => {
       image: images.map(img => `${siteUrl}/api/products/images/${img.id}`),
       category: p.category,
       aggregateRating: p.reviews > 0 ? { '@type': 'AggregateRating', ratingValue: p.rating, reviewCount: p.reviews } : undefined,
+      review: reviews.length ? reviews.slice(0, 20).map(r => ({
+        '@type': 'Review',
+        author: { '@type': 'Person', name: r.author_name },
+        datePublished: r.review_date,
+        reviewBody: r.review_text || undefined,
+        reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5 },
+      })) : undefined,
       offers: hasVariants ? {
         '@type': 'AggregateOffer', priceCurrency: settings.currency_symbol === 'Rs' ? 'PKR' : (settings.currency_symbol || 'PKR'),
         lowPrice: minPrice, highPrice: maxPrice, offerCount: variants.length, availability,
@@ -187,6 +199,21 @@ ${settings.custom_head_scripts || ''}
       <a class="btn btn--whatsapp" id="ppWhatsapp" href="#" target="_blank" rel="noopener">Order on WhatsApp</a>
     </div>
     <div class="pp-description">${p.description || ''}</div>
+    ${reviews.length ? `
+    <div class="pp-reviews">
+      <h2>Customer reviews</h2>
+      ${reviews.map(r => `
+        <div class="pp-review">
+          <div class="pp-review-head">
+            <b>${esc(r.author_name)}</b>
+            <span class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
+            ${r.source ? `<span class="pp-review-source">via ${esc(r.source)}</span>` : ''}
+          </div>
+          ${r.review_text ? `<p>${esc(r.review_text)}</p>` : ''}
+          <span class="pp-review-date">${new Date(r.review_date).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+        </div>
+      `).join('')}
+    </div>` : ''}
   </div>
 </main>
 

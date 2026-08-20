@@ -656,12 +656,70 @@ async function openProductForm(id) {
     VARIANTS = (p.variants || []).map(v => ({ ...v }));
     renderGallery();
     renderVariants();
+
+    document.getElementById('reviewsSaveFirstNote').style.display = 'none';
+    document.getElementById('reviewsList').style.display = 'block';
+    document.getElementById('addReviewFormWrap').style.display = 'block';
+    document.getElementById('rv_date').value = new Date().toISOString().slice(0, 10);
+    await renderReviewsList(id);
   } else {
+    document.getElementById('reviewsSaveFirstNote').style.display = 'block';
+    document.getElementById('reviewsList').style.display = 'none';
+    document.getElementById('addReviewFormWrap').style.display = 'none';
     document.getElementById('productModalTitle').textContent = 'Add product';
   }
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
+
+// ---------------- Product reviews (admin-entered) ----------------
+async function renderReviewsList(productId) {
+  const res = await fetch(`/api/products/${productId}/reviews`);
+  const reviews = await res.json();
+  const list = document.getElementById('reviewsList');
+  list.innerHTML = reviews.length ? reviews.map(r => `
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--sand-line); gap:10px;">
+      <div>
+        <b>${r.author_name}</b> — ${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}
+        ${r.source ? `<span class="pill pill-gray" style="margin-left:6px;">${r.source}</span>` : ''}
+        <div style="font-size:0.82rem; color:var(--ink-soft); margin-top:2px;">${r.review_text || ''}</div>
+        <div style="font-size:0.72rem; color:var(--ink-soft); margin-top:2px;">${new Date(r.review_date).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+      </div>
+      <button type="button" class="danger" data-delete-review="${r.id}" style="flex:none; border:none; background:#FCE4E4; color:#C23B3B; border-radius:8px; padding:4px 10px; font-size:0.78rem;">Delete</button>
+    </div>
+  `).join('') : `<p style="font-size:0.85rem; color:var(--ink-soft);">No reviews added yet.</p>`;
+
+  list.querySelectorAll('[data-delete-review]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this review?')) return;
+      await fetch(`/api/products/${productId}/reviews/${btn.dataset.deleteReview}`, { method: 'DELETE' });
+      renderReviewsList(productId);
+    });
+  });
+}
+
+document.getElementById('addReviewBtn').addEventListener('click', async () => {
+  if (!EDITING_PRODUCT_ID) return;
+  const author_name = document.getElementById('rv_author').value.trim();
+  if (!author_name) return toast('Enter the customer name', true);
+  const res = await fetch(`/api/products/${EDITING_PRODUCT_ID}/reviews`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      author_name,
+      rating: document.getElementById('rv_rating').value,
+      review_text: document.getElementById('rv_text').value.trim(),
+      review_date: document.getElementById('rv_date').value,
+      source: document.getElementById('rv_source').value.trim(),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) return toast(data.error, true);
+  toast('Review added');
+  document.getElementById('rv_author').value = '';
+  document.getElementById('rv_text').value = '';
+  document.getElementById('rv_source').value = '';
+  renderReviewsList(EDITING_PRODUCT_ID);
+});
 
 document.querySelectorAll('[data-close-modal]').forEach(el => {
   el.addEventListener('click', () => {
@@ -886,6 +944,7 @@ function openOrderDetail(id) {
       <div class="od-row"><span>Subtotal</span><span>${fmt(o.subtotal)}</span></div>
       <div class="od-row"><span>Delivery</span><span>${o.delivery_fee === 0 ? 'Free' : fmt(o.delivery_fee)}</span></div>
       ${o.coupon_code ? `<div class="od-row" style="color:#1DAE55;"><span>Coupon (${o.coupon_code})</span><span>−${fmt(o.discount_amount)}</span></div>` : ''}
+      ${o.cod_fee > 0 ? `<div class="od-row" style="color:var(--ink-soft); font-size:0.85rem;"><span>Cash handling fee (4%)</span><span>${fmt(o.cod_fee)}</span></div>` : ''}
       <div class="od-total-row"><span>Total</span><span>${fmt(o.total)}</span></div>
     </div>
 

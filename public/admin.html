@@ -454,6 +454,8 @@
         </table>
       </div>
     </section>
+  </main>
+</div>
 
 <!-- ============ PRODUCT FORM MODAL ============ -->
 <div class="modal" id="productModal">
@@ -534,6 +536,32 @@
         <label for="pf_description">Description</label>
         <div id="pf_description_editor"></div>
         <input type="hidden" id="pf_description">
+      </div>
+
+      <div class="form-field full" style="border-top:1px solid var(--sand-line); margin-top:6px; padding-top:16px;">
+        <label>Reviews <span style="font-weight:400; color:var(--ink-soft);">(add reviews you've collected elsewhere, e.g. from Daraz)</span></label>
+        <div id="reviewsManagerWrap">
+          <p id="reviewsSaveFirstNote" style="font-size:0.85rem; color:var(--ink-soft);">Save this product first, then come back to Edit it to add reviews.</p>
+          <div id="reviewsList" style="display:none;"></div>
+          <div id="addReviewFormWrap" style="display:none; margin-top:10px; padding:14px; background:var(--sand); border-radius:10px;">
+            <div class="admin-form-grid" style="padding:0; gap:10px;">
+              <div class="form-field"><label for="rv_author">Customer name</label><input type="text" id="rv_author"></div>
+              <div class="form-field"><label for="rv_rating">Rating</label>
+                <select id="rv_rating">
+                  <option value="5">★★★★★ (5)</option>
+                  <option value="4">★★★★☆ (4)</option>
+                  <option value="3">★★★☆☆ (3)</option>
+                  <option value="2">★★☆☆☆ (2)</option>
+                  <option value="1">★☆☆☆☆ (1)</option>
+                </select>
+              </div>
+              <div class="form-field"><label for="rv_date">Date</label><input type="date" id="rv_date"></div>
+              <div class="form-field"><label for="rv_source">Source (optional)</label><input type="text" id="rv_source" placeholder="Daraz"></div>
+              <div class="form-field full"><label for="rv_text">Review text</label><textarea id="rv_text" rows="2"></textarea></div>
+              <div class="form-field full"><button type="button" class="btn btn--primary" id="addReviewBtn" style="width:auto;">+ Add review</button></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="form-field full" style="border-top:1px solid var(--sand-line); margin-top:6px; padding-top:16px;">

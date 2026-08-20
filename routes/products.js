@@ -20,7 +20,7 @@ function slugify(name) {
 
 // Never send raw image bytes or the legacy blob column in list/detail JSON.
 function stripInternal(row) {
-  const { image_data, image_mime, ...rest } = row;
+  const { image_data, image_mime, computed_rating, ...rest } = row;
   return rest;
 }
 
@@ -33,32 +33,49 @@ async function attachImagesAndVariants(product) {
     'SELECT id, label, sku, price, compare_price, stock, sort_order FROM product_variants WHERE product_id = ? ORDER BY sort_order ASC, id ASC',
     [product.id]
   );
-  return { ...product, images, has_image: images.length > 0, variants, has_variants: variants.length > 0 };
+  const [reviewStats] = await pool.query(
+    'SELECT COUNT(*) AS c, AVG(rating) AS avg_rating FROM product_reviews WHERE product_id = ?',
+    [product.id]
+  );
+  const realReviewCount = reviewStats[0].c;
+  const realRating = realReviewCount > 0 ? Math.round(reviewStats[0].avg_rating * 10) / 10 : 0;
+  return {
+    ...product,
+    images, has_image: images.length > 0,
+    variants, has_variants: variants.length > 0,
+    rating: realRating, reviews: realReviewCount, // real data, not the old static seed values
+  };
 }
 
 // GET /api/products  ?category=&search=&sort=
 router.get('/', async (req, res) => {
   try {
     const { category, search, sort } = req.query;
-    let sql = 'SELECT * FROM products WHERE 1=1';
+    let sql = `
+      SELECT p.*, COALESCE(rv.avg_rating, 0) AS computed_rating
+      FROM products p
+      LEFT JOIN (SELECT product_id, AVG(rating) AS avg_rating FROM product_reviews GROUP BY product_id) rv
+        ON rv.product_id = p.id
+      WHERE 1=1
+    `;
     const params = [];
 
     if (category && category !== 'All') {
-      sql += ' AND category = ?';
+      sql += ' AND p.category = ?';
       params.push(category);
     }
     if (search) {
-      sql += ' AND (name LIKE ? OR description LIKE ?)';
+      sql += ' AND (p.name LIKE ? OR p.description LIKE ?)';
       params.push(`%${search}%`, `%${search}%`);
     }
 
     const sortMap = {
-      'price-asc': 'price ASC',
-      'price-desc': 'price DESC',
-      'rating': 'rating DESC',
-      'newest': 'created_at DESC',
+      'price-asc': 'p.price ASC',
+      'price-desc': 'p.price DESC',
+      'rating': 'computed_rating DESC',
+      'newest': 'p.created_at DESC',
     };
-    sql += ` ORDER BY ${sortMap[sort] || 'created_at DESC'}`;
+    sql += ` ORDER BY ${sortMap[sort] || 'p.created_at DESC'}`;
 
     const [rows] = await pool.query(sql, params);
     if (rows.length === 0) return res.json([]);
@@ -73,12 +90,18 @@ router.get('/', async (req, res) => {
       `SELECT product_id, COUNT(*) AS c, MIN(price) AS min_price, MAX(price) AS max_price, SUM(stock) AS total_stock FROM product_variants WHERE product_id IN (?) GROUP BY product_id`,
       [ids]
     );
+    const [reviewFlags] = await pool.query(
+      `SELECT product_id, COUNT(*) AS c, AVG(rating) AS avg_rating FROM product_reviews WHERE product_id IN (?) GROUP BY product_id`,
+      [ids]
+    );
     const imageMap = new Map(imageFlags.map(r => [r.product_id, true]));
     const variantMap = new Map(variantFlags.map(r => [r.product_id, r]));
+    const reviewMap = new Map(reviewFlags.map(r => [r.product_id, r]));
 
     const out = rows.map(row => {
       const stripped = stripInternal(row);
       const v = variantMap.get(row.id);
+      const rv = reviewMap.get(row.id);
       return {
         ...stripped,
         has_image: imageMap.has(row.id),
@@ -86,6 +109,8 @@ router.get('/', async (req, res) => {
         variant_count: v ? v.c : 0,
         price_range: v ? { min: v.min_price, max: v.max_price } : null,
         stock: v ? v.total_stock : row.stock,
+        rating: rv ? Math.round(rv.avg_rating * 10) / 10 : 0,
+        reviews: rv ? rv.c : 0,
       };
     });
     res.json(out);

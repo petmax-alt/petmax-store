@@ -111,14 +111,19 @@ router.post('/', async (req, res) => {
       await conn.query('UPDATE coupons SET used_count = used_count + 1 WHERE id = ?', [coupon.id]);
     }
 
-    const total = Math.max(0, subtotal + delivery_fee - discount_amount);
+    // Government-mandated 4% cash handling fee on Cash on Delivery orders — computed
+    // server-side only, never trusted from the client, same as delivery fee and discounts.
+    const COD_FEE_RATE = 0.04;
+    const collectibleBeforeCodFee = Math.max(0, subtotal + delivery_fee - discount_amount);
+    const cod_fee = payment_method === 'cod' ? Math.round(collectibleBeforeCodFee * COD_FEE_RATE) : 0;
+    const total = collectibleBeforeCodFee + cod_fee;
     const order_code = makeOrderCode();
     const payment_status = payment_method === 'online' ? 'awaiting_verification' : 'pending';
 
     const [info] = await conn.query(`
-      INSERT INTO orders (order_code, customer_name, phone, address, city, notes, payment_method, payment_status, transaction_id, items, subtotal, delivery_fee, total, customer_id, coupon_code, discount_amount)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [order_code, customer_name, phone, address, city, notes || '', payment_method || 'cod', payment_status, transaction_id || null, JSON.stringify(verifiedItems), subtotal, delivery_fee, total, (req.session && req.session.customerId) || null, appliedCouponCode, discount_amount]);
+      INSERT INTO orders (order_code, customer_name, phone, address, city, notes, payment_method, payment_status, transaction_id, items, subtotal, delivery_fee, total, customer_id, coupon_code, discount_amount, cod_fee)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [order_code, customer_name, phone, address, city, notes || '', payment_method || 'cod', payment_status, transaction_id || null, JSON.stringify(verifiedItems), subtotal, delivery_fee, total, (req.session && req.session.customerId) || null, appliedCouponCode, discount_amount, cod_fee]);
 
     for (const it of verifiedItems) {
       if (it.variant_id) {

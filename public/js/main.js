@@ -559,9 +559,18 @@ function renderCheckoutForm() {
   const subtotal = Cart.subtotal();
   const delivery = subtotal >= CONFIG.freeDeliveryThreshold ? 0 : CONFIG.deliveryFee;
   let appliedCoupon = null; // { code, discount }
+  let paymentMethod = 'cod';
+
+  const COD_FEE_RATE = 0.04; // government-mandated 4% fee on Cash on Delivery parcels
+
+  function codFee() {
+    if (paymentMethod !== 'cod') return 0;
+    const afterDiscount = Math.max(0, subtotal + delivery - (appliedCoupon ? appliedCoupon.discount : 0));
+    return Math.round(afterDiscount * COD_FEE_RATE);
+  }
 
   function currentTotal() {
-    return Math.max(0, subtotal + delivery - (appliedCoupon ? appliedCoupon.discount : 0));
+    return Math.max(0, subtotal + delivery - (appliedCoupon ? appliedCoupon.discount : 0) + codFee());
   }
 
   function renderSummary() {
@@ -570,6 +579,7 @@ function renderCheckoutForm() {
       <div class="summary-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
       <div class="summary-row"><span>Delivery</span><span>${delivery === 0 ? 'Free' : fmt(delivery)}</span></div>
       ${appliedCoupon ? `<div class="summary-row" style="color:#1DAE55;"><span>Coupon (${appliedCoupon.code})</span><span>−${fmt(appliedCoupon.discount)}</span></div>` : ''}
+      ${paymentMethod === 'cod' ? `<div class="summary-row" style="color:var(--ink-soft); font-size:0.82rem;"><span>Cash handling fee (4%)</span><span>${fmt(codFee())}</span></div>` : ''}
       <div class="summary-row total"><span>Total</span><span>${fmt(currentTotal())}</span></div>
     `;
     body.querySelector('#placeOrderBtn').textContent = `Place order — ${fmt(currentTotal())}`;
@@ -638,17 +648,15 @@ function renderCheckoutForm() {
         <p id="couponMsg" style="font-size:0.82rem; margin-top:6px;"></p>
       </div>
 
-      <div class="checkout-summary">
-        <div class="summary-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
-        <div class="summary-row"><span>Delivery</span><span>${delivery === 0 ? 'Free' : fmt(delivery)}</span></div>
-        <div class="summary-row total"><span>Total</span><span>${fmt(currentTotal())}</span></div>
-      </div>
+      <div class="checkout-summary"></div>
 
       <p class="field-error" id="checkoutError" style="display:none; margin-bottom:12px;"></p>
 
       <button type="submit" class="btn btn--primary btn--block" id="placeOrderBtn">Place order — ${fmt(currentTotal())}</button>
     </form>
   `;
+
+  renderSummary(); // populate the summary block just written above, including the COD fee if applicable
 
   body.querySelector('#applyCouponBtn').addEventListener('click', async () => {
     const code = document.getElementById('ck_coupon').value.trim();
@@ -673,13 +681,13 @@ function renderCheckoutForm() {
     }
   });
 
-  let paymentMethod = 'cod';
   body.querySelectorAll('.pay-option').forEach(opt => {
     opt.addEventListener('click', () => {
       body.querySelectorAll('.pay-option').forEach(o => o.classList.remove('selected'));
       opt.classList.add('selected');
       paymentMethod = opt.dataset.pay;
       document.getElementById('onlinePayFields').hidden = paymentMethod !== 'online';
+      renderSummary();
     });
   });
 
@@ -740,6 +748,7 @@ function renderOrderSuccess(order) {
         <div class="summary-row"><span>Name</span><span>${order.customer_name}</span></div>
         <div class="summary-row"><span>Phone</span><span>${order.phone}</span></div>
         <div class="summary-row"><span>Payment</span><span>${order.payment_method === 'cod' ? 'Cash on Delivery' : 'Online payment (verifying)'}</span></div>
+        ${order.cod_fee > 0 ? `<div class="summary-row" style="color:var(--ink-soft); font-size:0.82rem;"><span>Cash handling fee (4%)</span><span>${fmt(order.cod_fee)}</span></div>` : ''}
         <div class="summary-row total"><span>Total</span><span>${fmt(order.total)}</span></div>
       </div>
       <div style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;">

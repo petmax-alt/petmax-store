@@ -269,6 +269,15 @@ async function initSchema() {
       await conn.query('ALTER TABLE orders ADD COLUMN discount_amount INT NOT NULL DEFAULT 0');
     }
 
+    // Migration: 4% government-mandated cash handling fee on Cash on Delivery orders.
+    const [codFeeCol] = await conn.query(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'cod_fee'
+    `);
+    if (codFeeCol.length === 0) {
+      await conn.query('ALTER TABLE orders ADD COLUMN cod_fee INT NOT NULL DEFAULT 0');
+    }
+
     await conn.query(`
       CREATE TABLE IF NOT EXISTS admins (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -365,6 +374,20 @@ async function initSchema() {
         to_path VARCHAR(500) NOT NULL,
         status_code INT NOT NULL DEFAULT 301,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS product_reviews (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        author_name VARCHAR(150) NOT NULL,
+        rating INT NOT NULL,
+        review_text TEXT,
+        review_date DATE,
+        source VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
       )
     `);
 
