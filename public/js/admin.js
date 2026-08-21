@@ -288,7 +288,7 @@ function renderDashboard() {
 
   const tbody = document.querySelector('#recentOrdersTable tbody');
   tbody.innerHTML = ORDERS.slice(0, 6).map(o => `
-    <tr>
+    <tr class="order-row" data-view-order="${o.id}">
       <td><b>${o.order_code}</b></td>
       <td>${o.customer_name}</td>
       <td>${paymentPill(o)}</td>
@@ -296,6 +296,10 @@ function renderDashboard() {
       <td>${statusPill(o.status)}</td>
     </tr>
   `).join('') || `<tr><td colspan="5" style="text-align:center; color:var(--ink-soft); padding:30px;">No orders yet</td></tr>`;
+
+  tbody.querySelectorAll('[data-view-order]').forEach(row => {
+    row.addEventListener('click', () => openOrderDetail(Number(row.dataset.viewOrder)));
+  });
 
   renderRevenueChart();
   renderStatusChart();
@@ -897,8 +901,16 @@ function renderOrdersTable() {
       <td>${fmt(o.total)}</td>
       <td><span class="pill ${{ new: 'pill-orange', processing: 'pill-gray', shipped: 'pill-gray', delivered: 'pill-green', cancelled: 'pill-red' }[o.status] || 'pill-gray'}">${o.status[0].toUpperCase() + o.status.slice(1)}</span></td>
       <td style="font-size:0.78rem; color:var(--ink-soft);">${new Date(o.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}</td>
+      <td><button type="button" class="btn btn--ghost" style="padding:6px 14px; font-size:0.78rem;" data-view-order-btn="${o.id}">View →</button></td>
     </tr>
-  `).join('') || `<tr><td colspan="7" style="text-align:center; color:var(--ink-soft); padding:30px;">No orders match</td></tr>`;
+  `).join('') || `<tr><td colspan="8" style="text-align:center; color:var(--ink-soft); padding:30px;">No orders match</td></tr>`;
+
+  tbody.querySelectorAll('[data-view-order-btn]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // don't also trigger the row's own click handler
+      openOrderDetail(Number(btn.dataset.viewOrderBtn));
+    });
+  });
 
   tbody.querySelectorAll('[data-view-order]').forEach(row => {
     row.addEventListener('click', () => openOrderDetail(Number(row.dataset.viewOrder)));
