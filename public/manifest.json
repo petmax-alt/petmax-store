@@ -1,0 +1,12 @@
+{
+  "name": "Pet Max",
+  "short_name": "Pet Max",
+  "icons": [
+    { "src": "/images/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/images/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "theme_color": "#F4622E",
+  "background_color": "#FFF9F2",
+  "display": "standalone",
+  "start_url": "/"
+}

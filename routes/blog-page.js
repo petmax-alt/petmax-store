@@ -54,7 +54,11 @@ router.get('/blog/:slug', async (req, res, next) => {
 <meta name="description" content="${esc(metaDescription)}">
 <meta name="robots" content="${esc(robots)}">
 <link rel="canonical" href="${esc(pageUrl)}">
-<link rel="icon" href="/images/logo.png">
+<link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
 
 <meta property="og:type" content="article">
 <meta property="og:title" content="${esc(seoTitle)}">
@@ -73,7 +77,7 @@ router.get('/blog/:slug', async (req, res, next) => {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=20260821c">
+<link rel="stylesheet" href="/css/style.css?v=20260821d">
 ${settings.google_analytics_id ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(settings.google_analytics_id)}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(settings.google_analytics_id)}');</script>` : ''}
 ${settings.google_site_verification ? `<meta name="google-site-verification" content="${esc(settings.google_site_verification)}">` : ''}
