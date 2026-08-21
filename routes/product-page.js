@@ -136,7 +136,7 @@ ${p.focus_keyword ? `<meta name="keywords" content="${esc(p.focus_keyword)}">` :
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=20260821b">
+<link rel="stylesheet" href="/css/style.css?v=20260821c">
 ${settings.google_analytics_id ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(settings.google_analytics_id)}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(settings.google_analytics_id)}');</script>` : ''}
 ${settings.google_site_verification ? `<meta name="google-site-verification" content="${esc(settings.google_site_verification)}">` : ''}
@@ -232,8 +232,8 @@ ${settings.custom_head_scripts || ''}
 <a href="#" class="float-whatsapp" id="floatWhatsapp" aria-label="Chat on WhatsApp">💬</a>
 <div class="toast" id="toast"></div>
 
-<script src="/js/cart.js?v=20260821b"></script>
-<script src="/js/product-page.js?v=20260821b" data-product-id="${p.id}" data-product-name="${esc(p.name)}"></script>
+<script src="/js/cart.js?v=20260821c"></script>
+<script src="/js/product-page.js?v=20260821c" data-product-id="${p.id}" data-product-name="${esc(p.name)}"></script>
 ${settings.custom_footer_scripts || ''}
 </body>
 </html>`;

@@ -5,6 +5,7 @@ const fmt = (n) => `Rs ${Number(n).toLocaleString('en-PK')}`;
 
 let PRODUCTS = [];
 let ORDERS = [];
+let DATA_LOADED = false; // flips true once the first post-login fetch actually completes
 let CATEGORIES = [];
 let EDITING_PRODUCT_ID = null;
 let EXISTING_IMAGES = [];   // [{id}] already on the product, in display order
@@ -229,12 +230,19 @@ document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
     if (btn.dataset.view === 'users') renderAdminsTable();
     if (btn.dataset.view === 'settings') { renderSlidesGrid(); loadSettingsForm(); }
     if (btn.dataset.view === 'seo') { loadSeoForm(); renderRedirectsTable(); }
+    // These three were missing the same fresh-render-on-open treatment as every other
+    // tab above — if you clicked them before the initial post-login data fetch finished,
+    // they'd show empty and stay empty until something else happened to trigger a re-render.
+    if (btn.dataset.view === 'products') renderProductsTable();
+    if (btn.dataset.view === 'orders') renderOrdersTable();
+    if (btn.dataset.view === 'dashboard') renderDashboard();
   });
 });
 
 // ---------------- Load data ----------------
 async function loadAll() {
   await Promise.all([loadProducts(), loadOrders(), loadCategories()]);
+  DATA_LOADED = true;
   renderDashboard();
   renderProductsTable();
   renderOrdersTable();
@@ -295,7 +303,7 @@ function renderDashboard() {
       <td>${fmt(o.total)}</td>
       <td>${statusPill(o.status)}</td>
     </tr>
-  `).join('') || `<tr><td colspan="5" style="text-align:center; color:var(--ink-soft); padding:30px;">No orders yet</td></tr>`;
+  `).join('') || `<tr><td colspan="5" style="text-align:center; color:var(--ink-soft); padding:30px;">${DATA_LOADED ? "No orders yet" : "Loading…"}</td></tr>`;
 
   tbody.querySelectorAll('[data-view-order]').forEach(row => {
     row.addEventListener('click', () => openOrderDetail(Number(row.dataset.viewOrder)));
@@ -433,7 +441,7 @@ function renderInventoryTable() {
         </td>
       </tr>
     `;
-  }).join('') || `<tr><td colspan="6" style="text-align:center; color:var(--ink-soft); padding:30px;">No products yet</td></tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center; color:var(--ink-soft); padding:30px;">${DATA_LOADED ? "No products yet" : "Loading…"}</td></tr>`;
 
   tbody.querySelectorAll('[data-stock-adjust]').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -594,7 +602,7 @@ function renderProductsTable() {
         </div>
       </td>
     </tr>
-  `).join('') || `<tr><td colspan="8" style="text-align:center; color:var(--ink-soft); padding:30px;">No products yet</td></tr>`;
+  `).join('') || `<tr><td colspan="8" style="text-align:center; color:var(--ink-soft); padding:30px;">${DATA_LOADED ? "No products yet" : "Loading products…"}</td></tr>`;
 
   tbody.querySelectorAll('[data-select]').forEach(cb => {
     cb.addEventListener('change', () => {
@@ -903,7 +911,7 @@ function renderOrdersTable() {
       <td style="font-size:0.78rem; color:var(--ink-soft);">${new Date(o.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}</td>
       <td><button type="button" class="btn btn--ghost" style="padding:6px 14px; font-size:0.78rem;" data-view-order-btn="${o.id}">View →</button></td>
     </tr>
-  `).join('') || `<tr><td colspan="8" style="text-align:center; color:var(--ink-soft); padding:30px;">No orders match</td></tr>`;
+  `).join('') || `<tr><td colspan="8" style="text-align:center; color:var(--ink-soft); padding:30px;">${!DATA_LOADED ? 'Loading orders…' : ORDERS.length === 0 ? 'No orders yet' : 'No orders match your search'}</td></tr>`;
 
   tbody.querySelectorAll('[data-view-order-btn]').forEach(btn => {
     btn.addEventListener('click', (e) => {
