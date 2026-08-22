@@ -391,6 +391,87 @@ async function initSchema() {
       )
     `);
 
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS pages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) NOT NULL UNIQUE,
+        content LONGTEXT,
+        seo_title VARCHAR(255),
+        meta_description VARCHAR(300),
+        meta_robots VARCHAR(30) NOT NULL DEFAULT 'index,follow',
+        status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed the standard pages most stores need, so the site never looks incomplete
+    // out of the box. Content is a reasonable generic starting point, NOT legal advice —
+    // the admin should review and customize before relying on it.
+    const [pageCount] = await conn.query('SELECT COUNT(*) AS c FROM pages');
+    if (pageCount[0].c === 0) {
+      const starterPages = [
+        {
+          title: 'Privacy Policy', slug: 'privacy-policy',
+          content: `<p>This Privacy Policy explains how Pet Max ("we", "us") collects, uses, and protects your information when you use our website and place orders with us.</p>
+<h2>Information we collect</h2><p>When you place an order, we collect your name, phone number, delivery address, and city so we can fulfil and deliver your order. If you create an account, we also store your email address.</p>
+<h2>How we use your information</h2><p>We use your information solely to process orders, arrange delivery, communicate with you about your order, and improve our service. We do not sell your information to third parties.</p>
+<h2>Payment information</h2><p>We do not store your card or bank details. Online payments are verified manually using the reference number you provide.</p>
+<h2>Contact us</h2><p>If you have questions about this policy, please reach out via our Contact page.</p>
+<p><em>This is a starting template — please review and adjust it to accurately reflect your actual data practices before publishing.</em></p>`,
+        },
+        {
+          title: 'Terms & Conditions', slug: 'terms-and-conditions',
+          content: `<p>By using the Pet Max website and placing an order, you agree to the following terms.</p>
+<h2>Orders</h2><p>All orders are subject to product availability. We reserve the right to cancel any order if a product is out of stock or if there is an issue verifying payment.</p>
+<h2>Pricing</h2><p>Prices are listed in Pakistani Rupees (PKR) and may change without notice. The price at the time of order confirmation applies.</p>
+<h2>Payment</h2><p>We accept Cash on Delivery and online bank transfer / JazzCash / EasyPaisa. A cash handling fee applies to Cash on Delivery orders as disclosed at checkout.</p>
+<h2>Delivery</h2><p>Delivery times are estimates and may vary based on your location and courier availability.</p>
+<p><em>This is a starting template — please review and adjust it before publishing.</em></p>`,
+        },
+        {
+          title: 'Shipping Policy', slug: 'shipping-policy',
+          content: `<p>We deliver across Pakistan using trusted courier partners.</p>
+<h2>Delivery time</h2><p>Most orders are dispatched within 24-72 hours and delivered based on your city's courier timelines.</p>
+<h2>Delivery fee</h2><p>A flat delivery fee applies to orders below our free-delivery threshold, shown at checkout.</p>
+<h2>Tracking</h2><p>You can track your order status using your order code on our Track Order page.</p>
+<p><em>This is a starting template — please review and adjust it before publishing.</em></p>`,
+        },
+        {
+          title: 'Return & Refund Policy', slug: 'return-refund-policy',
+          content: `<p>We want you and your pet to be happy with every order.</p>
+<h2>Damaged or incorrect items</h2><p>If your order arrives damaged or incorrect, please contact us within 48 hours of delivery with photos, and we will arrange a replacement or refund.</p>
+<h2>Change of mind</h2><p>Due to the nature of pet food and treats, we're unable to accept returns for opened consumable items unless defective.</p>
+<h2>Refunds</h2><p>Approved refunds for online payments are processed back to your original payment method within a reasonable timeframe.</p>
+<p><em>This is a starting template — please review and adjust it before publishing.</em></p>`,
+        },
+        {
+          title: 'About Us', slug: 'about-us',
+          content: `<p>Pet Max started with one simple idea: give Pakistani cat parents the same quality of food, treats, and care products their cats deserve — delivered right to their door.</p>
+<p>We hand-pick every product on our shelf, and we're just as picky about it as you are, because our own cats eat this food too.</p>`,
+        },
+      ];
+      for (const p of starterPages) {
+        await conn.query(
+          'INSERT INTO pages (title, slug, content, status) VALUES (?, ?, ?, ?)',
+          [p.title, p.slug, p.content, 'draft']
+        );
+      }
+    }
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS contact_messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        message TEXT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'unread',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     const seoDefaults = {
       site_name: 'Pet Max',
       default_meta_description: "Cat food, treats, litter, grooming and toys — ordered online, delivered across Pakistan with Cash on Delivery.",

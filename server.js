@@ -29,6 +29,8 @@ app.use('/api/slides', require('./routes/slides'));
 app.use('/api/site-images', require('./routes/site-images'));
 app.use('/api/redirects', require('./routes/redirects'));
 app.use('/api/products', require('./routes/reviews'));
+app.use('/api/pages', require('./routes/pages'));
+app.use('/api/contact', require('./routes/contact'));
 
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res) => {
@@ -46,9 +48,15 @@ app.get('/blog', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'blog.html'));
 });
 
+app.get('/contact', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'contact.html'));
+});
+
 app.use('/', require('./routes/product-page'));
 app.use('/', require('./routes/blog-page'));
+app.use('/', require('./routes/category-page'));
 app.use('/', require('./routes/seo'));
+app.use('/', require('./routes/page-page')); // catch-all single-segment slugs — must stay last
 
 // 301/302 redirects, checked after all real routes so nothing legitimate gets hijacked
 app.use(async (req, res, next) => {

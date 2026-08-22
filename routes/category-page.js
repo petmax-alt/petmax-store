@@ -12,38 +12,55 @@ function esc(str) {
   if (str === null || str === undefined) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-function stripHtml(html) {
-  return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-}
 
-router.get('/blog/:slug', async (req, res, next) => {
+router.get('/category/:slug', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM blog_posts WHERE slug = ?', [req.params.slug]);
-    const post = rows[0];
-    if (!post || (post.status !== 'published' && !(req.session && req.session.isAdmin))) return next();
+    const [catRows] = await pool.query('SELECT * FROM categories WHERE slug = ?', [req.params.slug]);
+    const category = catRows[0];
+    if (!category) return next();
 
+    const [products] = await pool.query('SELECT * FROM products WHERE category = ? ORDER BY created_at DESC', [category.name]);
     const settings = await getSettings();
     const siteUrl = (settings.site_url || 'https://petmax.pk').replace(/\/$/, '');
     const siteName = settings.site_name || 'Pet Max';
-    const pageUrl = `${siteUrl}/blog/${post.slug}`;
+    const pageUrl = `${siteUrl}/category/${category.slug}`;
+    const seoTitle = category.seo_title || `${category.name} | ${siteName}`;
+    const metaDescription = category.meta_description || `Shop ${category.name.toLowerCase()} at ${siteName} — delivered across Pakistan with Cash on Delivery.`;
 
-    const seoTitle = post.seo_title || `${post.title} | ${siteName} Blog`;
-    const metaDescription = post.meta_description || post.excerpt || stripHtml(post.content).slice(0, 155);
-    const robots = post.meta_robots || 'index,follow';
-    const ogImage = post.cover_image_data ? `${siteUrl}/api/blog/image/${post.id}` : `${siteUrl}/images/logo.png`;
+    // One query for cover images, avoiding N+1
+    const productIds = products.map(p => p.id);
+    let imageMap = new Map();
+    if (productIds.length) {
+      const [imgRows] = await pool.query(
+        'SELECT product_id, MIN(id) AS cover_id FROM product_images WHERE product_id IN (?) GROUP BY product_id',
+        [productIds]
+      );
+      imageMap = new Map(imgRows.map(r => [r.product_id, true]));
+    }
 
-    const articleSchema = {
-      '@context': 'https://schema.org',
-      '@type': 'Article',
-      headline: post.title,
-      description: metaDescription,
-      image: [ogImage],
-      datePublished: post.published_at,
-      dateModified: post.updated_at,
-      author: { '@type': 'Organization', name: siteName },
-      publisher: { '@type': 'Organization', name: siteName, logo: { '@type': 'ImageObject', url: `${siteUrl}/images/logo.png` } },
-      mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
+    const breadcrumbSchema = {
+      '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+        { '@type': 'ListItem', position: 2, name: category.name, item: pageUrl },
+      ],
     };
+    const itemListSchema = {
+      '@context': 'https://schema.org', '@type': 'ItemList',
+      itemListElement: products.map((p, i) => ({
+        '@type': 'ListItem', position: i + 1, url: `${siteUrl}/product/${p.slug}`,
+      })),
+    };
+
+    const cardsHtml = products.map(p => `
+      <a href="/product/${p.slug}" class="cat-product-card">
+        <div class="cat-product-media">${imageMap.has(p.id) ? `<img src="/api/products/image/${p.id}" alt="${esc(p.name)}" loading="lazy">` : '<div class="cat-product-placeholder">🐾</div>'}</div>
+        <div class="cat-product-body">
+          <h2>${esc(p.name)}</h2>
+          <span class="price">Rs ${Number(p.price).toLocaleString('en-PK')}</span>
+        </div>
+      </a>
+    `).join('');
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -52,35 +69,22 @@ router.get('/blog/:slug', async (req, res, next) => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${esc(seoTitle)}</title>
 <meta name="description" content="${esc(metaDescription)}">
-<meta name="robots" content="${esc(robots)}">
 <link rel="canonical" href="${esc(pageUrl)}">
 <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-<link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
-<link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
-
-<meta property="og:type" content="article">
+<meta property="og:type" content="website">
 <meta property="og:title" content="${esc(seoTitle)}">
 <meta property="og:description" content="${esc(metaDescription)}">
-<meta property="og:image" content="${esc(ogImage)}">
 <meta property="og:url" content="${esc(pageUrl)}">
 <meta property="og:site_name" content="${esc(siteName)}">
-
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${esc(seoTitle)}">
-<meta name="twitter:description" content="${esc(metaDescription)}">
-<meta name="twitter:image" content="${esc(ogImage)}">
-
-<script type="application/ld+json">${JSON.stringify(articleSchema)}</script>
-
+<script type="application/ld+json">${JSON.stringify(breadcrumbSchema)}</script>
+<script type="application/ld+json">${JSON.stringify(itemListSchema)}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css?v=20260822">
 ${settings.google_analytics_id ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(settings.google_analytics_id)}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(settings.google_analytics_id)}');</script>` : ''}
-${settings.google_site_verification ? `<meta name="google-site-verification" content="${esc(settings.google_site_verification)}">` : ''}
 ${settings.custom_head_scripts || ''}
 </head>
 <body>
@@ -88,14 +92,14 @@ ${settings.custom_head_scripts || ''}
 <header class="site-header">
   <div class="header-inner">
     <a href="/" class="brand">
-      <img src="/images/logo.png" alt="Pet Max logo">
+      <img src="/images/logo.png" alt="${esc(siteName)} logo">
       <span class="brand-name">PET MAX<span>Tech made simple, tails made happy</span></span>
     </a>
     <nav class="main-nav">
       <a href="/#shop">Shop</a>
       <a href="/#categories">Categories</a>
-      <a href="/#about">Why Pet Max</a>
-      <a href="/blog" class="active">Blog</a>
+      <a href="/blog">Blog</a>
+      <a href="/contact">Contact</a>
     </nav>
     <div class="header-actions">
       <button class="icon-btn" onclick="location.href='/'" aria-label="Back to shop">
@@ -105,18 +109,19 @@ ${settings.custom_head_scripts || ''}
   </div>
 </header>
 
-<main class="blog-post-wrap">
-  <a href="/blog" class="blog-back-link">← Back to blog</a>
-  ${post.cover_image_data ? `<div class="blog-post-cover"><img src="/api/blog/image/${post.id}" alt="${esc(post.title)}"></div>` : ''}
-  <span class="blog-card-date">${new Date(post.published_at || post.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-  <h1>${esc(post.title)}</h1>
-  <div class="blog-post-content">${post.content || ''}</div>
+<nav class="pp-breadcrumb container">
+  <a href="/">Home</a> / <span>${esc(category.name)}</span>
+</nav>
+
+<main class="cat-page-wrap container">
+  <h1>${esc(category.name)}</h1>
+  ${products.length ? `<div class="cat-product-grid">${cardsHtml}</div>` : `<p class="cat-empty">No products in this category yet — check back soon.</p>`}
 </main>
 
 <footer class="site-footer">
   <div class="footer-grid">
     <div class="footer-brand">
-      <img src="/images/logo.png" alt="Pet Max">
+      <img src="/images/logo.png" alt="${esc(siteName)}">
       <p>A Pakistan-based pet supplies store for cat food, treats, litter, grooming and toys.</p>
     </div>
   </div>
@@ -134,7 +139,7 @@ ${settings.custom_footer_scripts || ''}
     res.send(html);
   } catch (err) {
     console.error(err);
-    res.status(500).send('Something went wrong loading this post.');
+    res.status(500).send('Something went wrong loading this category.');
   }
 });
 

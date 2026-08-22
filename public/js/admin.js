@@ -230,6 +230,7 @@ document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
     if (btn.dataset.view === 'users') renderAdminsTable();
     if (btn.dataset.view === 'settings') { renderSlidesGrid(); loadSettingsForm(); }
     if (btn.dataset.view === 'seo') { loadSeoForm(); renderRedirectsTable(); }
+    if (btn.dataset.view === 'pages') { renderPagesTable(); renderContactTable(); }
     // These three were missing the same fresh-render-on-open treatment as every other
     // tab above — if you clicked them before the initial post-login data fetch finished,
     // they'd show empty and stay empty until something else happened to trigger a re-render.
@@ -1566,5 +1567,121 @@ document.getElementById('addRedirectForm').addEventListener('submit', async (e) 
   document.getElementById('addRedirectForm').reset();
   renderRedirectsTable();
 });
+
+// ---------------- Static Pages ----------------
+let PAGES = [];
+let EDITING_PAGE_ID = null;
+
+const pageContentEditor = new Quill('#pg_content_editor', {
+  theme: 'snow',
+  modules: { toolbar: [[{ header: [2, 3, false] }], ['bold', 'italic', 'underline'], [{ list: 'ordered' }, { list: 'bullet' }], ['link'], ['clean']] },
+});
+pageContentEditor.on('text-change', () => {
+  document.getElementById('pg_content').value = pageContentEditor.root.innerHTML;
+});
+
+async function renderPagesTable() {
+  const res = await fetch('/api/pages/admin');
+  PAGES = await res.json();
+  document.getElementById('pagesTableBody').innerHTML = PAGES.map(p => `
+    <tr>
+      <td><b>${p.title}</b></td>
+      <td>${p.status === 'published' ? '<span class="pill pill-green">Published</span>' : '<span class="pill pill-gray">Draft</span>'}</td>
+      <td class="row-actions">
+        <button data-edit-page="${p.id}">Edit</button>
+        <button class="danger" data-delete-page="${p.id}">Delete</button>
+      </td>
+    </tr>
+  `).join('') || `<tr><td colspan="3" style="text-align:center; color:var(--ink-soft); padding:30px;">No pages yet</td></tr>`;
+
+  document.querySelectorAll('[data-edit-page]').forEach(btn => btn.addEventListener('click', () => openPageForm(Number(btn.dataset.editPage))));
+  document.querySelectorAll('[data-delete-page]').forEach(btn => btn.addEventListener('click', async () => {
+    const p = PAGES.find(x => x.id === Number(btn.dataset.deletePage));
+    if (!confirm(`Delete "${p.title}"?`)) return;
+    await fetch(`/api/pages/${p.id}`, { method: 'DELETE' });
+    toast('Page deleted');
+    renderPagesTable();
+  }));
+}
+
+function openPageForm(id) {
+  EDITING_PAGE_ID = id;
+  document.getElementById('pageForm').reset();
+  pageContentEditor.setContents([]);
+  document.getElementById('pageFormError').style.display = 'none';
+
+  if (id) {
+    const p = PAGES.find(x => x.id === id);
+    document.getElementById('pageModalTitle').textContent = 'Edit page';
+    document.getElementById('pg_title').value = p.title;
+    document.getElementById('pg_status').value = p.status;
+    if (p.content) pageContentEditor.root.innerHTML = p.content;
+    document.getElementById('pg_content').value = p.content || '';
+  } else {
+    document.getElementById('pageModalTitle').textContent = 'New page';
+  }
+  document.getElementById('pageModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+document.getElementById('addPageBtn').addEventListener('click', () => openPageForm(null));
+
+document.getElementById('pageForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('pageFormError');
+  errorEl.style.display = 'none';
+  const payload = {
+    title: document.getElementById('pg_title').value.trim(),
+    content: document.getElementById('pg_content').value,
+    status: document.getElementById('pg_status').value,
+  };
+  const saveBtn = document.getElementById('pageSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  try {
+    const url = EDITING_PAGE_ID ? `/api/pages/${EDITING_PAGE_ID}` : '/api/pages';
+    const method = EDITING_PAGE_ID ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save page');
+    document.getElementById('pageModal').classList.remove('open');
+    document.body.style.overflow = '';
+    toast(EDITING_PAGE_ID ? 'Page updated' : 'Page created');
+    renderPagesTable();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save page';
+  }
+});
+
+// ---------------- Contact messages ----------------
+async function renderContactTable() {
+  const res = await fetch('/api/contact');
+  const messages = await res.json();
+  document.getElementById('contactTableBody').innerHTML = messages.map(m => `
+    <tr style="${m.status === 'unread' ? 'font-weight:700;' : ''}">
+      <td>${m.name}${m.phone ? `<br><span style="font-weight:400; font-size:0.78rem; color:var(--ink-soft);">${m.phone}</span>` : ''}</td>
+      <td style="max-width:320px;">${m.message}</td>
+      <td style="font-size:0.78rem; color:var(--ink-soft); font-weight:400;">${new Date(m.created_at).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}</td>
+      <td class="row-actions">
+        ${m.status === 'unread' ? `<button data-mark-read="${m.id}">Mark read</button>` : ''}
+        <button class="danger" data-delete-msg="${m.id}">Delete</button>
+      </td>
+    </tr>
+  `).join('') || `<tr><td colspan="4" style="text-align:center; color:var(--ink-soft); padding:30px;">No messages yet</td></tr>`;
+
+  document.querySelectorAll('[data-mark-read]').forEach(btn => btn.addEventListener('click', async () => {
+    await fetch(`/api/contact/${btn.dataset.markRead}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'read' }) });
+    renderContactTable();
+  }));
+  document.querySelectorAll('[data-delete-msg]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('Delete this message?')) return;
+    await fetch(`/api/contact/${btn.dataset.deleteMsg}`, { method: 'DELETE' });
+    renderContactTable();
+  }));
+}
 
 checkAuth();

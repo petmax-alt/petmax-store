@@ -14,12 +14,17 @@ router.get('/sitemap.xml', async (req, res) => {
 
     const [products] = await pool.query('SELECT slug, created_at FROM products');
     const [posts] = await pool.query("SELECT slug, updated_at FROM blog_posts WHERE status = 'published'");
+    const [pages] = await pool.query("SELECT slug, updated_at FROM pages WHERE status = 'published'");
+    const [categories] = await pool.query('SELECT slug FROM categories');
 
     const urls = [
       { loc: siteUrl, priority: '1.0' },
       { loc: `${siteUrl}/blog`, priority: '0.7' },
+      { loc: `${siteUrl}/contact`, priority: '0.5' },
       ...products.map(p => ({ loc: `${siteUrl}/product/${p.slug}`, lastmod: p.created_at, priority: '0.8' })),
+      ...categories.map(c => ({ loc: `${siteUrl}/category/${c.slug}`, priority: '0.7' })),
       ...posts.map(p => ({ loc: `${siteUrl}/blog/${p.slug}`, lastmod: p.updated_at, priority: '0.6' })),
+      ...pages.map(p => ({ loc: `${siteUrl}/${p.slug}`, lastmod: p.updated_at, priority: '0.4' })),
     ];
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>

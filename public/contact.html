@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact Us | Pet Max</title>
+<meta name="description" content="Get in touch with Pet Max — order questions, delivery timing, or just to talk cats.">
+<link rel="canonical" href="https://petmax.pk/contact">
+<link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css?v=20260822">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="brand">
+      <img src="/images/logo.png" alt="Pet Max logo">
+      <span class="brand-name">PET MAX<span>Tech made simple, tails made happy</span></span>
+    </a>
+    <nav class="main-nav">
+      <a href="/#shop">Shop</a>
+      <a href="/#categories">Categories</a>
+      <a href="/blog">Blog</a>
+      <a href="/contact" class="active">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="location.href='/'" aria-label="Back to shop">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="contact-wrap container">
+  <div class="contact-grid">
+    <div class="contact-info">
+      <h1>Get in touch</h1>
+      <p>Order questions, delivery timing, or just want to talk about cats — we're a real, small team and we actually read these.</p>
+      <a class="btn btn--whatsapp" id="contactWhatsapp" href="#" target="_blank" rel="noopener" style="margin-top:16px; display:inline-flex;">Chat on WhatsApp</a>
+    </div>
+    <form id="contactForm" class="contact-form">
+      <div class="form-field full">
+        <label for="cf_name">Your name</label>
+        <input type="text" id="cf_name" required>
+      </div>
+      <div class="form-field">
+        <label for="cf_email">Email (optional)</label>
+        <input type="email" id="cf_email">
+      </div>
+      <div class="form-field">
+        <label for="cf_phone">Phone (optional)</label>
+        <input type="tel" id="cf_phone">
+      </div>
+      <div class="form-field full">
+        <label for="cf_message">Message</label>
+        <textarea id="cf_message" rows="5" required></textarea>
+      </div>
+      <p class="field-error" id="contactError" style="display:none; grid-column:1/-1;"></p>
+      <p id="contactSuccess" style="display:none; grid-column:1/-1; color:#1DAE55; font-weight:600;">Thanks — we'll get back to you soon!</p>
+      <button type="submit" class="btn btn--primary" id="contactSubmitBtn" style="grid-column:1/-1;">Send message</button>
+    </form>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <img src="/images/logo.png" alt="Pet Max">
+      <p>A Pakistan-based pet supplies store for cat food, treats, litter, grooming and toys.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <ul>
+        <li><a href="/about-us">About Us</a></li>
+        <li><a href="/contact">Contact</a></li>
+        <li><a href="/privacy-policy">Privacy Policy</a></li>
+        <li><a href="/terms-and-conditions">Terms &amp; Conditions</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© <span id="year"></span> Pet Max. Made for cats, run from Lahore.</span>
+  </div>
+</footer>
+
+<script>
+document.getElementById('year').textContent = new Date().getFullYear();
+
+fetch('/api/settings').then(r => r.json()).then(s => {
+  const number = s.whatsapp_number || '923001234567';
+  document.getElementById('contactWhatsapp').href = `https://wa.me/${number}?text=${encodeURIComponent("Hi Pet Max! I have a question.")}`;
+});
+
+document.getElementById('contactForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorEl = document.getElementById('contactError');
+  const successEl = document.getElementById('contactSuccess');
+  errorEl.style.display = 'none';
+  successEl.style.display = 'none';
+  const btn = document.getElementById('contactSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const res = await fetch('/api/contact', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: document.getElementById('cf_name').value.trim(),
+        email: document.getElementById('cf_email').value.trim(),
+        phone: document.getElementById('cf_phone').value.trim(),
+        message: document.getElementById('cf_message').value.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not send your message');
+    successEl.style.display = 'block';
+    document.getElementById('contactForm').reset();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send message';
+  }
+});
+</script>
+</body>
+</html>
