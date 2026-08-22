@@ -212,7 +212,7 @@ function showAdmin() {
 }
 
 // ---------------- Nav ----------------
-const ALL_VIEWS = ['dashboard', 'orders', 'products', 'categories', 'inventory', 'customers', 'coupons', 'analytics', 'blog', 'seo', 'settings', 'users'];
+const ALL_VIEWS = ['dashboard', 'orders', 'products', 'categories', 'inventory', 'customers', 'coupons', 'analytics', 'blog', 'seo', 'pages', 'settings', 'users'];
 
 document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn => {
   btn.addEventListener('click', () => {
