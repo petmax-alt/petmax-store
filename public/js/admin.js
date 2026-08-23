@@ -521,6 +521,8 @@ async function loadSettingsForm() {
     document.getElementById('st_banner_text').value = s.banner_text || '';
     document.getElementById('st_banner_link').value = s.banner_link || '';
     document.getElementById('st_google_client_id').value = s.google_client_id || '';
+    document.getElementById('st_facebook_url').value = s.facebook_url || '';
+    document.getElementById('st_instagram_url').value = s.instagram_url || '';
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save settings';
@@ -553,6 +555,8 @@ document.getElementById('settingsForm').addEventListener('submit', async (e) => 
         banner_text: document.getElementById('st_banner_text').value.trim(),
         banner_link: document.getElementById('st_banner_link').value.trim(),
         google_client_id: document.getElementById('st_google_client_id').value.trim(),
+        facebook_url: document.getElementById('st_facebook_url').value.trim(),
+        instagram_url: document.getElementById('st_instagram_url').value.trim(),
       }),
     });
     if (!res.ok) throw new Error('Could not save settings');

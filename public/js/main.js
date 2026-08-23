@@ -828,7 +828,7 @@ document.querySelectorAll('[data-cat-link]').forEach(el => {
 // ---------------- WhatsApp buttons (generic) ----------------
 function wireGenericWhatsappButtons() {
   const genericWaText = `Hi Pet Max! I'd like to ask about your products for my cat.`;
-  ['heroWhatsapp', 'footerWhatsapp', 'floatWhatsapp'].forEach(id => {
+  ['heroWhatsapp', 'footerWhatsapp', 'floatWhatsapp', 'socialWhatsappIcon'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.href = waLink(CONFIG.whatsappNumber, genericWaText);
@@ -864,6 +864,14 @@ async function loadSiteSettings() {
       banner.innerHTML = s.banner_link ? `<a href="${s.banner_link}">${s.banner_text}</a>` : s.banner_text;
     }
     if (s.google_client_id) CONFIG.googleClientId = s.google_client_id;
+    if (s.facebook_url) {
+      const el = document.getElementById('socialFacebook');
+      if (el) { el.href = s.facebook_url; el.hidden = false; }
+    }
+    if (s.instagram_url) {
+      const el = document.getElementById('socialInstagram');
+      if (el) { el.href = s.instagram_url; el.hidden = false; }
+    }
   } catch (err) {
     // If this fails, the storefront still works using the hardcoded fallback values above.
     console.warn('Could not load live settings, using defaults', err);

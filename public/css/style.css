@@ -561,9 +561,11 @@ h1, h2, h3, h4 {
 .social-row { display: flex; gap: 10px; }
 .social-row a {
   width: 36px; height: 36px; border-radius: 50%;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.08); color: var(--white);
   display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s ease;
 }
+.social-row a[hidden] { display: none; }
 .social-row a:hover { background: var(--orange); }
 
 /* ============ Floating WhatsApp ============ */

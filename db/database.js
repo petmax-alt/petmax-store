@@ -210,6 +210,8 @@ async function initSchema() {
       bank_account: '',
       bank_iban: '',
       google_client_id: '', // Google Sign-In is off until the admin adds a real Client ID here
+      facebook_url: 'https://www.facebook.com/petmax.pk/',
+      instagram_url: 'https://www.instagram.com/petmax.pk/',
     };
     for (const [key, value] of Object.entries(defaults)) {
       await conn.query('INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
