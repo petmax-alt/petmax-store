@@ -25,6 +25,9 @@ router.get('/product/:slug', async (req, res, next) => {
     const p = rows[0];
     if (!p) return next(); // fall through to 404 handling
 
+    // Fire-and-forget: don't make the page wait on this, and don't fail the page if it errors.
+    pool.query('UPDATE products SET views = views + 1 WHERE id = ?', [p.id]).catch(() => {});
+
     const [images] = await pool.query('SELECT id FROM product_images WHERE product_id = ? ORDER BY sort_order ASC, id ASC', [p.id]);
     const [variants] = await pool.query('SELECT * FROM product_variants WHERE product_id = ? ORDER BY sort_order ASC, id ASC', [p.id]);
     const [reviews] = await pool.query('SELECT * FROM product_reviews WHERE product_id = ? ORDER BY review_date DESC', [p.id]);
@@ -140,7 +143,7 @@ ${p.focus_keyword ? `<meta name="keywords" content="${esc(p.focus_keyword)}">` :
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=20260822c">
+<link rel="stylesheet" href="/css/style.css?v=20260823">
 ${settings.google_analytics_id ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(settings.google_analytics_id)}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(settings.google_analytics_id)}');</script>` : ''}
 ${settings.google_site_verification ? `<meta name="google-site-verification" content="${esc(settings.google_site_verification)}">` : ''}
@@ -236,8 +239,8 @@ ${settings.custom_head_scripts || ''}
 <a href="#" class="float-whatsapp" id="floatWhatsapp" aria-label="Chat on WhatsApp">💬</a>
 <div class="toast" id="toast"></div>
 
-<script src="/js/cart.js?v=20260822c"></script>
-<script src="/js/product-page.js?v=20260822c" data-product-id="${p.id}" data-product-name="${esc(p.name)}"></script>
+<script src="/js/cart.js?v=20260823"></script>
+<script src="/js/product-page.js?v=20260823" data-product-id="${p.id}" data-product-name="${esc(p.name)}"></script>
 ${settings.custom_footer_scripts || ''}
 </body>
 </html>`;

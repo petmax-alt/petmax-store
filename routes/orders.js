@@ -10,8 +10,18 @@ function makeOrderCode() {
 }
 
 // Fallback values only — real values now live in the settings table (admin-editable).
-const DEFAULT_DELIVERY_FEE = 200;
 const DEFAULT_FREE_DELIVERY_THRESHOLD = 3000;
+const DEFAULT_SHIPPING_RATES = { tier1: 190, tier2: 260, tier3: 340, extraKg: 110 };
+
+// Mirrors the courier's real tariff slabs: 0.5kg / 1kg / 2kg breakpoints,
+// then a flat per-kg rate beyond that. Only the rates themselves are admin-editable.
+function calcShippingFee(weightKg, rates) {
+  if (weightKg <= 0.5) return rates.tier1;
+  if (weightKg <= 1.0) return rates.tier2;
+  if (weightKg <= 2.0) return rates.tier3;
+  const extraKg = Math.ceil(weightKg - 2.0);
+  return rates.tier3 + extraKg * rates.extraKg;
+}
 
 // POST /api/orders — place a new order (COD or online)
 router.post('/', async (req, res) => {
@@ -33,6 +43,7 @@ router.post('/', async (req, res) => {
 
     // Re-price server-side from the DB so totals can't be tampered with client-side
     let subtotal = 0;
+    let totalWeightKg = 0;
     const verifiedItems = [];
 
     for (const item of items) {
@@ -40,7 +51,7 @@ router.post('/', async (req, res) => {
 
       if (item.variant_id) {
         const [variantRows] = await conn.query(
-          'SELECT v.*, p.name AS product_name FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.id = ? AND v.product_id = ? FOR UPDATE',
+          'SELECT v.*, p.name AS product_name, p.weight AS product_weight FROM product_variants v JOIN products p ON p.id = v.product_id WHERE v.id = ? AND v.product_id = ? FOR UPDATE',
           [item.variant_id, item.id]
         );
         const variant = variantRows[0];
@@ -53,6 +64,7 @@ router.post('/', async (req, res) => {
           return res.status(400).json({ error: `Only ${variant.stock} left in stock for "${variant.product_name} — ${variant.label}".` });
         }
         subtotal += variant.price * qty;
+        totalWeightKg += Number(variant.product_weight) * qty; // variants share the parent product's weight
         verifiedItems.push({
           id: variant.product_id, variant_id: variant.id,
           name: `${variant.product_name} — ${variant.label}`, price: variant.price, qty,
@@ -71,18 +83,24 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: `Only ${product.stock} left in stock for "${product.name}".` });
       }
       subtotal += product.price * qty;
+      totalWeightKg += Number(product.weight) * qty;
       verifiedItems.push({ id: product.id, variant_id: null, name: product.name, price: product.price, qty });
     }
 
     const [settingsRows] = await conn.query(
-      "SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('delivery_fee', 'free_delivery_threshold')"
+      "SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('free_delivery_threshold', 'shipping_rate_tier1', 'shipping_rate_tier2', 'shipping_rate_tier3', 'shipping_rate_extra_kg')"
     );
     const settingsMap = {};
     for (const row of settingsRows) settingsMap[row.setting_key] = row.setting_value;
-    const deliveryFeeAmount = Number(settingsMap.delivery_fee ?? DEFAULT_DELIVERY_FEE);
     const freeDeliveryThreshold = Number(settingsMap.free_delivery_threshold ?? DEFAULT_FREE_DELIVERY_THRESHOLD);
+    const shippingRates = {
+      tier1: Number(settingsMap.shipping_rate_tier1 ?? DEFAULT_SHIPPING_RATES.tier1),
+      tier2: Number(settingsMap.shipping_rate_tier2 ?? DEFAULT_SHIPPING_RATES.tier2),
+      tier3: Number(settingsMap.shipping_rate_tier3 ?? DEFAULT_SHIPPING_RATES.tier3),
+      extraKg: Number(settingsMap.shipping_rate_extra_kg ?? DEFAULT_SHIPPING_RATES.extraKg),
+    };
 
-    const delivery_fee = subtotal >= freeDeliveryThreshold ? 0 : deliveryFeeAmount;
+    const delivery_fee = subtotal >= freeDeliveryThreshold ? 0 : calcShippingFee(totalWeightKg, shippingRates);
 
     // Re-validate the coupon server-side too — never trust a discount amount from the client.
     let discount_amount = 0;

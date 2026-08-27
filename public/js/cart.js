@@ -42,6 +42,7 @@ const Cart = (() => {
         icon: product.icon,
         accent: product.accent,
         stock: variant ? variant.stock : product.stock,
+        weight: product.weight || 0.5, // variants share the parent product's weight
         qty,
       });
     }
@@ -78,5 +79,9 @@ const Cart = (() => {
     return read().reduce((sum, i) => sum + i.price * i.qty, 0);
   }
 
-  return { getItems, addItem, setQty, removeItem, clear, count, subtotal };
+  function totalWeight() {
+    return read().reduce((sum, i) => sum + (i.weight || 0.5) * i.qty, 0);
+  }
+
+  return { getItems, addItem, setQty, removeItem, clear, count, subtotal, totalWeight };
 })();

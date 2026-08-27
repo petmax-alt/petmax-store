@@ -506,8 +506,11 @@ async function loadSettingsForm() {
     const res = await fetch('/api/settings');
     const s = await res.json();
     document.getElementById('st_whatsapp').value = s.whatsapp_number || '';
-    document.getElementById('st_delivery_fee').value = s.delivery_fee || '';
     document.getElementById('st_free_delivery_threshold').value = s.free_delivery_threshold || '';
+    document.getElementById('st_ship_tier1').value = s.shipping_rate_tier1 || '';
+    document.getElementById('st_ship_tier2').value = s.shipping_rate_tier2 || '';
+    document.getElementById('st_ship_tier3').value = s.shipping_rate_tier3 || '';
+    document.getElementById('st_ship_extra').value = s.shipping_rate_extra_kg || '';
     document.getElementById('st_currency').value = s.currency_symbol || '';
     document.getElementById('st_bank_title').value = s.bank_account_title || '';
     document.getElementById('st_jazzcash').value = s.bank_jazzcash || '';
@@ -540,8 +543,11 @@ document.getElementById('settingsForm').addEventListener('submit', async (e) => 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         whatsapp_number: document.getElementById('st_whatsapp').value.trim(),
-        delivery_fee: document.getElementById('st_delivery_fee').value,
         free_delivery_threshold: document.getElementById('st_free_delivery_threshold').value,
+        shipping_rate_tier1: document.getElementById('st_ship_tier1').value,
+        shipping_rate_tier2: document.getElementById('st_ship_tier2').value,
+        shipping_rate_tier3: document.getElementById('st_ship_tier3').value,
+        shipping_rate_extra_kg: document.getElementById('st_ship_extra').value,
         currency_symbol: document.getElementById('st_currency').value.trim(),
         bank_account_title: document.getElementById('st_bank_title').value.trim(),
         bank_jazzcash: document.getElementById('st_jazzcash').value.trim(),
@@ -600,6 +606,7 @@ function renderProductsTable() {
       <td>${p.has_variants ? `${fmt(p.price_range.min)}${p.price_range.min !== p.price_range.max ? '–' + fmt(p.price_range.max) : ''}` : fmt(p.price)}</td>
       <td>${p.stock <= 0 ? '<span class="pill pill-red">Out</span>' : p.stock <= 5 ? `<span class="pill pill-orange">${p.stock} left</span>` : p.stock}</td>
       <td>${p.badge ? `<span class="pill pill-gray">${p.badge}</span>` : '—'}</td>
+      <td style="text-align:center;">👁 ${p.views || 0}</td>
       <td>
         <div class="row-actions">
           <button data-edit="${p.id}">Edit</button>
@@ -607,7 +614,7 @@ function renderProductsTable() {
         </div>
       </td>
     </tr>
-  `).join('') || `<tr><td colspan="8" style="text-align:center; color:var(--ink-soft); padding:30px;">${DATA_LOADED ? "No products yet" : "Loading products…"}</td></tr>`;
+  `).join('') || `<tr><td colspan="9" style="text-align:center; color:var(--ink-soft); padding:30px;">${DATA_LOADED ? "No products yet" : "Loading products…"}</td></tr>`;
 
   tbody.querySelectorAll('[data-select]').forEach(cb => {
     cb.addEventListener('change', () => {
@@ -655,6 +662,7 @@ async function openProductForm(id) {
     document.getElementById('pf_price').value = p.price;
     document.getElementById('pf_compare').value = p.compare_price || '';
     document.getElementById('pf_stock').value = p.stock;
+    document.getElementById('pf_weight').value = p.weight || 0.5;
     document.getElementById('pf_badge').value = p.badge || '';
     document.getElementById('pf_accent').value = p.accent;
     document.getElementById('pf_sku').value = p.sku || '';
@@ -757,6 +765,7 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   formData.append('price', document.getElementById('pf_price').value);
   formData.append('compare_price', document.getElementById('pf_compare').value || '');
   formData.append('stock', document.getElementById('pf_stock').value);
+  formData.append('weight', document.getElementById('pf_weight').value);
   formData.append('badge', document.getElementById('pf_badge').value);
   formData.append('accent', document.getElementById('pf_accent').value);
   formData.append('sku', document.getElementById('pf_sku').value.trim());
@@ -1171,6 +1180,7 @@ document.getElementById('blogForm').addEventListener('submit', async (e) => {
 // ---------------- Analytics ----------------
 let bestSellersChartInstance = null;
 let categoryRevenueChartInstance = null;
+let mostViewedChartInstance = null;
 
 function renderAnalytics() {
   // Best sellers: aggregate quantity sold per product name across all orders.
@@ -1206,6 +1216,15 @@ function renderAnalytics() {
       datasets: [{ data: catEntries.map(x => x[1]), backgroundColor: ['#F4622E', '#294061', '#25D366', '#F2A93B', '#C23B3B', '#8E6FF7'] }],
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } } },
+  });
+
+  const topViewed = [...PRODUCTS].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 8);
+  const mvCtx = document.getElementById('mostViewedChart');
+  if (mostViewedChartInstance) mostViewedChartInstance.destroy();
+  mostViewedChartInstance = new Chart(mvCtx, {
+    type: 'bar',
+    data: { labels: topViewed.map(p => p.name), datasets: [{ label: 'Page views', data: topViewed.map(p => p.views || 0), backgroundColor: '#294061' }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
   });
 
   const byPhone = {};

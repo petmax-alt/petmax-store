@@ -212,6 +212,12 @@ async function initSchema() {
       google_client_id: '', // Google Sign-In is off until the admin adds a real Client ID here
       facebook_url: 'https://www.facebook.com/petmax.pk/',
       instagram_url: 'https://www.instagram.com/petmax.pk/',
+      // Weight-tiered shipping — mirrors your courier's actual slab structure.
+      // Tier breakpoints (0.5kg / 1kg / 2kg) are fixed logic; only the rates are editable here.
+      shipping_rate_tier1: '190', // up to 0.5kg
+      shipping_rate_tier2: '260', // 0.5kg to 1kg
+      shipping_rate_tier3: '340', // 1kg to 2kg
+      shipping_rate_extra_kg: '110', // per kg beyond 2kg
     };
     for (const [key, value] of Object.entries(defaults)) {
       await conn.query('INSERT IGNORE INTO settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
@@ -350,6 +356,8 @@ async function initSchema() {
       ['og_title', 'VARCHAR(255)'],
       ['og_description', 'VARCHAR(300)'],
       ['gtin', 'VARCHAR(50)'],
+      ['weight', "DECIMAL(6,2) NOT NULL DEFAULT 0.5"],
+      ['views', 'INT NOT NULL DEFAULT 0'],
       ['mpn', 'VARCHAR(50)'],
       ['brand', "VARCHAR(150) NOT NULL DEFAULT 'Pet Max'"],
     ]) {

@@ -14,7 +14,7 @@ const CONFIG = {
     iban: 'PK00MEZN0000000123456789',
   },
   freeDeliveryThreshold: 3000,
-  deliveryFee: 200,
+  shippingRates: { tier1: 190, tier2: 260, tier3: 340, extraKg: 110 },
   googleClientId: '', // set via Store Settings — Google Sign-In stays off until this is filled in
 };
 
@@ -37,6 +37,16 @@ function toast(msg) {
 
 function waLink(number, text) {
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
+}
+
+// Mirrors routes/orders.js calcShippingFee exactly — keep both in sync if the tiers ever change.
+function calcShippingFee(weightKg) {
+  const r = CONFIG.shippingRates;
+  if (weightKg <= 0.5) return r.tier1;
+  if (weightKg <= 1.0) return r.tier2;
+  if (weightKg <= 2.0) return r.tier3;
+  const extraKg = Math.ceil(weightKg - 2.0);
+  return r.tier3 + extraKg * r.extraKg;
 }
 
 // ---------------- Data loading ----------------
@@ -340,7 +350,7 @@ function renderCartDrawer() {
   }));
 
   const subtotal = Cart.subtotal();
-  const delivery = subtotal >= CONFIG.freeDeliveryThreshold ? 0 : CONFIG.deliveryFee;
+  const delivery = subtotal >= CONFIG.freeDeliveryThreshold ? 0 : calcShippingFee(Cart.totalWeight());
   document.getElementById('cartSubtotal').textContent = fmt(subtotal);
   document.getElementById('cartDelivery').textContent = delivery === 0 ? 'Free' : fmt(delivery);
   document.getElementById('cartTotal').textContent = fmt(subtotal + delivery);
@@ -557,7 +567,7 @@ function renderCheckoutForm() {
   const body = document.getElementById('checkoutBody');
   const items = Cart.getItems();
   const subtotal = Cart.subtotal();
-  const delivery = subtotal >= CONFIG.freeDeliveryThreshold ? 0 : CONFIG.deliveryFee;
+  const delivery = subtotal >= CONFIG.freeDeliveryThreshold ? 0 : calcShippingFee(Cart.totalWeight());
   let appliedCoupon = null; // { code, discount }
   let paymentMethod = 'cod';
 
@@ -845,8 +855,11 @@ async function loadSiteSettings() {
     const res = await fetch('/api/settings');
     const s = await res.json();
     if (s.whatsapp_number) CONFIG.whatsappNumber = s.whatsapp_number;
-    if (s.delivery_fee) CONFIG.deliveryFee = Number(s.delivery_fee);
     if (s.free_delivery_threshold) CONFIG.freeDeliveryThreshold = Number(s.free_delivery_threshold);
+    if (s.shipping_rate_tier1) CONFIG.shippingRates.tier1 = Number(s.shipping_rate_tier1);
+    if (s.shipping_rate_tier2) CONFIG.shippingRates.tier2 = Number(s.shipping_rate_tier2);
+    if (s.shipping_rate_tier3) CONFIG.shippingRates.tier3 = Number(s.shipping_rate_tier3);
+    if (s.shipping_rate_extra_kg) CONFIG.shippingRates.extraKg = Number(s.shipping_rate_extra_kg);
     if (s.bank_account_title) CONFIG.bank.accountTitle = s.bank_account_title;
     if (s.bank_jazzcash) CONFIG.bank.jazzcash = s.bank_jazzcash;
     if (s.bank_easypaisa) CONFIG.bank.easypaisa = s.bank_easypaisa;
