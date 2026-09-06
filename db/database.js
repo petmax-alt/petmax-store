@@ -132,15 +132,6 @@ async function initSchema() {
       await conn.query('ALTER TABLE customers ADD COLUMN google_id VARCHAR(255) NULL UNIQUE');
     }
 
-    // Migration: link orders to a registered customer when one placed them (still nullable — guest checkout stays supported)
-    const [customerIdCol] = await conn.query(`
-      SELECT COLUMN_NAME FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'customer_id'
-    `);
-    if (customerIdCol.length === 0) {
-      await conn.query('ALTER TABLE orders ADD COLUMN customer_id INT NULL');
-    }
-
     await conn.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -161,6 +152,15 @@ async function initSchema() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migration: link orders to a registered customer when one placed them (still nullable — guest checkout stays supported)
+    const [customerIdCol] = await conn.query(`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'customer_id'
+    `);
+    if (customerIdCol.length === 0) {
+      await conn.query('ALTER TABLE orders ADD COLUMN customer_id INT NULL');
+    }
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS subscribers (

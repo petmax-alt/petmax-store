@@ -50,7 +50,7 @@ router.get('/:slug', async (req, res, next) => {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=20260823">
+<link rel="stylesheet" href="/css/style.css?v=20260824">
 ${settings.google_analytics_id ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(settings.google_analytics_id)}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(settings.google_analytics_id)}');</script>` : ''}
 ${settings.custom_head_scripts || ''}
@@ -70,8 +70,9 @@ ${settings.custom_head_scripts || ''}
       <a href="/contact">Contact</a>
     </nav>
     <div class="header-actions">
-      <button class="icon-btn" onclick="location.href='/'" aria-label="Back to shop">
+      <button class="icon-btn" id="cartBtn" aria-label="Open cart">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span class="badge-count" id="cartCount" hidden>0</span>
       </button>
     </div>
   </div>
@@ -105,6 +106,8 @@ ${settings.custom_head_scripts || ''}
   </div>
 </footer>
 
+<script src="/js/cart.js?v=20260824"></script>
+<script src="/js/cart-drawer.js?v=20260824"></script>
 <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
 ${settings.custom_footer_scripts || ''}
 </body>

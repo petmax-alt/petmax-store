@@ -143,7 +143,7 @@ ${p.focus_keyword ? `<meta name="keywords" content="${esc(p.focus_keyword)}">` :
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=20260823">
+<link rel="stylesheet" href="/css/style.css?v=20260824">
 ${settings.google_analytics_id ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(settings.google_analytics_id)}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(settings.google_analytics_id)}');</script>` : ''}
 ${settings.google_site_verification ? `<meta name="google-site-verification" content="${esc(settings.google_site_verification)}">` : ''}
@@ -167,7 +167,7 @@ ${settings.custom_head_scripts || ''}
       <button class="icon-btn" id="accountBtn" aria-label="Account" onclick="location.href='/'">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </button>
-      <button class="icon-btn" id="cartBtn" aria-label="Open cart" onclick="location.href='/'">
+      <button class="icon-btn" id="cartBtn" aria-label="Open cart">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
         <span class="badge-count" id="cartCount" hidden>0</span>
       </button>
@@ -239,8 +239,9 @@ ${settings.custom_head_scripts || ''}
 <a href="#" class="float-whatsapp" id="floatWhatsapp" aria-label="Chat on WhatsApp">💬</a>
 <div class="toast" id="toast"></div>
 
-<script src="/js/cart.js?v=20260823"></script>
-<script src="/js/product-page.js?v=20260823" data-product-id="${p.id}" data-product-name="${esc(p.name)}"></script>
+<script src="/js/cart.js?v=20260824"></script>
+<script src="/js/cart-drawer.js?v=20260824"></script>
+<script src="/js/product-page.js?v=20260824" data-product-id="${p.id}" data-product-name="${esc(p.name)}"></script>
 ${settings.custom_footer_scripts || ''}
 </body>
 </html>`;

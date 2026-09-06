@@ -318,7 +318,7 @@ function renderCartDrawer() {
   foot.hidden = false;
   body.innerHTML = items.map((i, idx) => `
     <div class="cart-line" data-line="${idx}">
-      <div class="cart-line-thumb accent-${i.accent}">${getProductIcon(i.icon, i.accent)}</div>
+      <div class="cart-line-thumb accent-${i.accent}">${i.has_image ? `<img src="/api/products/image/${i.id}" alt="${i.name}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">` : getProductIcon(i.icon, i.accent)}</div>
       <div class="cart-line-info">
         <div class="name">${i.name}</div>
         <div class="cat">${i.category}</div>
@@ -962,4 +962,12 @@ function initScrollAnimations() {
   await loadCarousel();
   renderCartDrawer();
   initScrollAnimations();
+
+  // Someone clicked Checkout on a non-homepage page's cart drawer and got sent here —
+  // pick up right where they left off instead of leaving them looking at a plain homepage.
+  if (new URLSearchParams(location.search).get('checkout') === '1' && Cart.getItems().length > 0) {
+    history.replaceState(null, '', location.pathname); // clean the URL, don't leave ?checkout=1 sitting there
+    renderCheckoutForm();
+    openModal(document.getElementById('checkoutModal'));
+  }
 })();

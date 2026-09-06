@@ -43,6 +43,7 @@ const Cart = (() => {
         accent: product.accent,
         stock: variant ? variant.stock : product.stock,
         weight: product.weight || 0.5, // variants share the parent product's weight
+        has_image: product.has_image || false,
         qty,
       });
     }
